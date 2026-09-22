@@ -13,9 +13,11 @@ import {
 } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
+import { DatePicker } from "@/shared/components/ui/date-picker";
+import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
 import { createTask, updateTask } from "../api/task-mutations";
-import type { TaskDTO } from "../types/task.types";
-import type { TaskPriority, TaskStatus } from "@/lib/constants";
+import { IconSettings, IconCrown } from "@tabler/icons-react";
+import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
 
 export interface ProjectMemberOption {
   readonly id: string;
@@ -23,28 +25,71 @@ export interface ProjectMemberOption {
   readonly email: string;
 }
 
+export interface TaskEpicOption {
+  readonly id: string;
+  readonly title: string;
+  readonly customId: string | null;
+}
+
 export interface TaskFormDialogProps {
   readonly projectId: string;
   readonly members?: readonly ProjectMemberOption[];
+  readonly availableEpics?: readonly TaskEpicOption[];
+  readonly customStatuses?: readonly CustomStatusOption[] | null;
+  readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly taskToEdit?: TaskDTO;
   readonly trigger?: React.ReactNode;
   readonly isOpenControlled?: boolean;
   readonly onOpenChangeControlled?: (open: boolean) => void;
 }
 
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getTodayString(): string {
-  return new Date().toISOString().split("T")[0] ?? "2026-01-01";
+  return formatLocalDate(new Date());
 }
 
 function getOneWeekLaterString(): string {
   const d = new Date();
   d.setDate(d.getDate() + 7);
-  return d.toISOString().split("T")[0] ?? "2026-01-08";
+  return formatLocalDate(d);
 }
+
+function calculateDuration(startStr: string, endStr: string): number {
+  if (!startStr || !endStr) return 1;
+  const start = new Date(`${startStr}T00:00:00`);
+  const end = new Date(`${endStr}T00:00:00`);
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays > 0 ? diffDays : 1;
+}
+
+const fallbackStatuses: CustomStatusOption[] = [
+  { id: "TODO", label: "Por Hacer" },
+  { id: "IN_PROGRESS", label: "En Progreso" },
+  { id: "IN_REVIEW", label: "En Revisión" },
+  { id: "DONE", label: "Completada" },
+  { id: "CANCELLED", label: "Cancelada" },
+];
+
+const fallbackPriorities: CustomPriorityOption[] = [
+  { id: "LOW", label: "Baja" },
+  { id: "MEDIUM", label: "Media" },
+  { id: "HIGH", label: "Alta" },
+  { id: "URGENT", label: "Urgente" },
+];
 
 export function TaskFormDialog({
   projectId,
   members = [],
+  availableEpics = [],
+  customStatuses = fallbackStatuses,
+  customPriorities = fallbackPriorities,
   taskToEdit,
   trigger,
   isOpenControlled,
@@ -54,27 +99,77 @@ export function TaskFormDialog({
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
   const isControlled = isOpenControlled !== undefined;
   const isOpen = isControlled ? isOpenControlled : internalOpen;
-  const setOpen = isControlled ? onOpenChangeControlled! : setInternalOpen;
+  const setOpen = isControlled
+    ? (open: boolean) => onOpenChangeControlled?.(open)
+    : setInternalOpen;
 
+  const [statuses, setStatuses] = useState<CustomStatusOption[]>(
+    customStatuses && customStatuses.length > 0 ? [...customStatuses] : fallbackStatuses
+  );
+  const [priorities, setPriorities] = useState<CustomPriorityOption[]>(
+    customPriorities && customPriorities.length > 0 ? [...customPriorities] : fallbackPriorities
+  );
+  const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+
+  // 1. ID / Clave
+  const [customId, setCustomId] = useState<string>(taskToEdit?.customId ?? "");
+  // 2. Actividad / Título
   const [title, setTitle] = useState<string>(taskToEdit?.title ?? "");
-  const [description, setDescription] = useState<string>(taskToEdit?.description ?? "");
-  const [priority, setPriority] = useState<TaskPriority>(taskToEdit?.priority ?? "MEDIUM");
-  const [status, setStatus] = useState<TaskStatus>(taskToEdit?.status ?? "TODO");
-  const [progress, setProgress] = useState<number>(taskToEdit?.progress ?? 0);
+  // 3. Requerimiento
+  const [requirement, setRequirement] = useState<string>(taskToEdit?.requirement ?? "");
+  // 4. Sprint
+  const [sprint, setSprint] = useState<string>(taskToEdit?.sprint ?? "");
+  // 5. Asignado
+  const [assigneeId, setAssigneeId] = useState<string>(taskToEdit?.assigneeId ?? "");
+  // 6, 7, 8. Fechas & Duración
   const [startDate, setStartDate] = useState<string>(taskToEdit?.startDate ?? getTodayString());
   const [dueDate, setDueDate] = useState<string>(taskToEdit?.dueDate ?? getOneWeekLaterString());
-  const [assigneeId, setAssigneeId] = useState<string>(taskToEdit?.assigneeId ?? "");
+  const [durationDays, setDurationDays] = useState<number>(
+    taskToEdit?.durationDays ?? calculateDuration(taskToEdit?.startDate ?? getTodayString(), taskToEdit?.dueDate ?? getOneWeekLaterString())
+  );
+  // 9. Predecesoras
+  const [predecessors, setPredecessors] = useState<string>(taskToEdit?.predecessors ?? "");
+  // EPICs
+  const [isEpic, setIsEpic] = useState<boolean>(taskToEdit?.isEpic ?? false);
+  const [parentId, setParentId] = useState<string>(taskToEdit?.parentId ?? "");
+  // Status & Priority
+  const [status, setStatus] = useState<string>(taskToEdit?.status ?? "TODO");
+  const [priority, setPriority] = useState<string>(taskToEdit?.priority ?? "MEDIUM");
+  const [description, setDescription] = useState<string>(taskToEdit?.description ?? "");
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-recalculate duration when dates change
+  const handleStartDateChange = (newStart: string): void => {
+    setStartDate(newStart);
+    setDurationDays(calculateDuration(newStart, dueDate));
+  };
+
+  const handleDueDateChange = (newDue: string): void => {
+    setDueDate(newDue);
+    setDurationDays(calculateDuration(startDate, newDue));
+  };
+
+  const handleDurationChange = (days: number): void => {
+    setDurationDays(days);
+    if (startDate && days > 0) {
+      const d = new Date(`${startDate}T00:00:00`);
+      d.setDate(d.getDate() + (days - 1));
+      setDueDate(formatLocalDate(d));
+    }
+  };
+
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!title.trim()) {
-      setError("Task title is required");
+      setError("La actividad o nombre de la tarea es obligatorio");
       return;
     }
     if (dueDate < startDate) {
-      setError("Due date cannot be earlier than start date");
+      setError("La fecha de fin no puede ser anterior a la de inicio");
       return;
     }
 
@@ -85,13 +180,19 @@ export function TaskFormDialog({
       if (taskToEdit) {
         const res = await updateTask({
           taskId: taskToEdit.id,
+          customId: customId.trim() || null,
           title: title.trim(),
           description: description.trim() || null,
+          requirement: requirement.trim() || null,
+          sprint: sprint.trim() || null,
+          durationDays,
           priority,
           status,
-          progress,
           startDate,
           dueDate,
+          predecessors: predecessors.trim() || null,
+          isEpic,
+          parentId: isEpic ? null : parentId || null,
           assigneeId: assigneeId || null,
         });
 
@@ -103,13 +204,19 @@ export function TaskFormDialog({
       } else {
         const res = await createTask({
           projectId,
+          customId: customId.trim() || undefined,
           title: title.trim(),
           description: description.trim() || undefined,
+          requirement: requirement.trim() || undefined,
+          sprint: sprint.trim() || undefined,
+          durationDays,
           priority,
           status,
-          progress,
           startDate,
           dueDate,
+          predecessors: predecessors.trim() || undefined,
+          isEpic,
+          parentId: isEpic ? undefined : parentId || undefined,
           assigneeId: assigneeId || undefined,
         });
 
@@ -122,140 +229,143 @@ export function TaskFormDialog({
 
       setOpen(false);
       if (!taskToEdit) {
+        setCustomId("");
         setTitle("");
+        setRequirement("");
+        setSprint("");
         setDescription("");
-        setProgress(0);
+        setPredecessors("");
+        setIsEpic(false);
+        setParentId("");
       }
       router.refresh();
     } catch {
-      setError("An unexpected error occurred");
+      setError("Ocurrió un error inesperado al guardar la tarea");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setOpen}>
-      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="border-border bg-surface sm:max-w-lg">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-text-primary">
-              {taskToEdit ? "Edit Task" : "Create New Task"}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-text-secondary">
-              {taskToEdit ? "Update task properties and schedule." : "Add a new task to your project timeline."}
-            </DialogDescription>
-          </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={setOpen}>
+        {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+        <DialogContent className="border-border bg-surface sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit}>
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-xl font-bold text-text-primary">
+                    {taskToEdit ? "Editar Tarea" : "Crear Nueva Tarea"}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-text-secondary mt-0.5">
+                    {taskToEdit
+                      ? "Actualiza las propiedades, fechas y dependencias de la tarea."
+                      : "Registra una nueva actividad en el cronograma de trabajo."}
+                  </DialogDescription>
+                </div>
 
-          <div className="my-5 flex flex-col gap-4">
-            {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                {error}
+                {/* Epic indicator */}
+                {isEpic && (
+                  <div className="flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400">
+                    <IconCrown className="size-3.5" />
+                    <span>Tarea EPIC</span>
+                  </div>
+                )}
               </div>
-            )}
+            </DialogHeader>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="task-title" className="text-xs font-medium text-text-secondary">
-                Title *
-              </label>
-              <Input
-                id="task-title"
-                type="text"
-                placeholder="e.g. Design wireframes"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={isLoading}
-                required
-                maxLength={255}
-                className="border-border bg-background text-text-primary"
-              />
-            </div>
+            <div className="my-5 flex flex-col gap-4">
+              {error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                  {error}
+                </div>
+              )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-status" className="text-xs font-medium text-text-secondary">
-                  Status
-                </label>
-                <select
-                  id="task-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                  disabled={isLoading}
-                  className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-text-primary focus:border-primary focus:outline-none"
-                >
-                  <option value="TODO">To Do</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="IN_REVIEW">In Review</option>
-                  <option value="DONE">Done</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
+              {/* 1. ID & 2. Actividad */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="flex flex-col gap-1.5 sm:col-span-1">
+                  <label htmlFor="task-custom-id" className="text-xs font-semibold text-text-primary">
+                    1. ID
+                  </label>
+                  <Input
+                    id="task-custom-id"
+                    type="text"
+                    placeholder="ej. T1.1, CU01"
+                    value={customId}
+                    onChange={(e) => setCustomId(e.target.value)}
+                    disabled={isLoading}
+                    maxLength={50}
+                    className="border-border bg-background text-xs font-mono"
+                  />
+                </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-priority" className="text-xs font-medium text-text-secondary">
-                  Priority
-                </label>
-                <select
-                  id="task-priority"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  disabled={isLoading}
-                  className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-text-primary focus:border-primary focus:outline-none"
-                >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="URGENT">Urgent</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-start" className="text-xs font-medium text-text-secondary">
-                  Start Date *
-                </label>
-                <Input
-                  id="task-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  disabled={isLoading}
-                  required
-                  className="border-border bg-background text-text-primary"
-                />
+                <div className="flex flex-col gap-1.5 sm:col-span-3">
+                  <label htmlFor="task-title" className="text-xs font-semibold text-text-primary">
+                    2. Actividad *
+                  </label>
+                  <Input
+                    id="task-title"
+                    type="text"
+                    placeholder="ej. Configuración del entorno, Especificar CU"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    maxLength={255}
+                    className="border-border bg-background text-xs"
+                  />
+                </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-due" className="text-xs font-medium text-text-secondary">
-                  Due Date *
-                </label>
-                <Input
-                  id="task-due"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  disabled={isLoading}
-                  required
-                  className="border-border bg-background text-text-primary"
-                />
-              </div>
-            </div>
+              {/* 3. Requerimiento & 4. Sprint */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="task-req" className="text-xs font-semibold text-text-primary">
+                    3. Requerimiento
+                  </label>
+                  <Input
+                    id="task-req"
+                    type="text"
+                    placeholder="ej. RF01, RNF02, RF04"
+                    value={requirement}
+                    onChange={(e) => setRequirement(e.target.value)}
+                    disabled={isLoading}
+                    maxLength={50}
+                    className="border-border bg-background text-xs font-mono"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="task-sprint" className="text-xs font-semibold text-text-primary">
+                    4. Sprint
+                  </label>
+                  <Input
+                    id="task-sprint"
+                    type="text"
+                    placeholder="ej. 1, 2, 3 o Sprint 1"
+                    value={sprint}
+                    onChange={(e) => setSprint(e.target.value)}
+                    disabled={isLoading}
+                    maxLength={50}
+                    className="border-border bg-background text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Asignado */}
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-assignee" className="text-xs font-medium text-text-secondary">
-                  Assignee
+                <label htmlFor="task-assignee" className="text-xs font-semibold text-text-primary">
+                  5. Asignado
                 </label>
                 <select
                   id="task-assignee"
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
                   disabled={isLoading}
-                  className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-text-primary focus:border-primary focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
                 >
-                  <option value="">Unassigned</option>
+                  <option value="">Sin asignar / Todo el equipo</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name ? `${m.name} (${m.email})` : m.email}
@@ -264,64 +374,227 @@ export function TaskFormDialog({
                 </select>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="task-progress" className="text-xs font-medium text-text-secondary">
-                    Progress
+              {/* 6. Duración, 7. Inicio, 8. Fin */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="task-start" className="text-xs font-semibold text-text-primary">
+                    7. Inicio *
                   </label>
-                  <span className="text-xs font-mono text-primary">{progress}%</span>
+                  <DatePicker
+                    id="task-start"
+                    value={startDate}
+                    onChange={handleStartDateChange}
+                    disabled={isLoading}
+                    required
+                  />
                 </div>
-                <input
-                  id="task-progress"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={progress}
-                  onChange={(e) => setProgress(Number(e.target.value))}
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="task-due" className="text-xs font-semibold text-text-primary">
+                    8. Fin *
+                  </label>
+                  <DatePicker
+                    id="task-due"
+                    value={dueDate}
+                    onChange={handleDueDateChange}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="task-duration" className="text-xs font-semibold text-text-primary">
+                    6. Duración (días)
+                  </label>
+                  <Input
+                    id="task-duration"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={durationDays}
+                    onChange={(e) => handleDurationChange(Math.max(1, Number(e.target.value) || 1))}
+                    disabled={isLoading}
+                    className="border-border bg-background text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* 9. Predecesoras */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
+                  9. Predecesoras
+                </label>
+                <Input
+                  id="task-predecessors"
+                  type="text"
+                  placeholder="ej. T1.1, T1.3, CU01"
+                  value={predecessors}
+                  onChange={(e) => setPredecessors(e.target.value)}
                   disabled={isLoading}
-                  className="accent-primary"
+                  maxLength={500}
+                  className="border-border bg-background text-xs font-mono"
+                />
+              </div>
+
+              {/* EPIC / Jerarquía Maestra */}
+              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconCrown className="size-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-text-primary">
+                      Tarea Maestra (EPIC)
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isEpic}
+                      onChange={(e) => setIsEpic(e.target.checked)}
+                      disabled={isLoading}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                  </label>
+                </div>
+
+                {!isEpic && availableEpics.length > 0 && (
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-purple-500/20">
+                    <label htmlFor="task-epic-parent" className="text-xs font-medium text-text-secondary">
+                      Pertenece al EPIC:
+                    </label>
+                    <select
+                      id="task-epic-parent"
+                      value={parentId}
+                      onChange={(e) => setParentId(e.target.value)}
+                      disabled={isLoading}
+                      className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
+                    >
+                      <option value="">Ninguno (Tarea independiente)</option>
+                      {availableEpics
+                        .filter((ep) => !taskToEdit || ep.id !== taskToEdit.id)
+                        .map((ep) => (
+                          <option key={ep.id} value={ep.id}>
+                            {ep.customId ? `[${ep.customId}] ` : ""}{ep.title}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Estado y Prioridad con Botón de Ajustes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="task-status" className="text-xs font-semibold text-text-primary">
+                      Estado
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfigOpen(true)}
+                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      <IconSettings className="size-3" />
+                      <span>Personalizar</span>
+                    </button>
+                  </div>
+                  <select
+                    id="task-status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    disabled={isLoading}
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
+                  >
+                    {statuses.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="task-priority" className="text-xs font-semibold text-text-primary">
+                      Prioridad
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfigOpen(true)}
+                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      <IconSettings className="size-3" />
+                      <span>Personalizar</span>
+                    </button>
+                  </div>
+                  <select
+                    id="task-priority"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    disabled={isLoading}
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
+                  >
+                    {priorities.map((pr) => (
+                      <option key={pr.id} value={pr.id}>
+                        {pr.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Descripción opcional */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="task-description" className="text-xs font-semibold text-text-primary">
+                  Descripción / Criterios de Aceptación (opcional)
+                </label>
+                <textarea
+                  id="task-description"
+                  rows={2}
+                  placeholder="Detalles adicionales, checklist o notas..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isLoading}
+                  maxLength={2000}
+                  className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="task-description" className="text-xs font-medium text-text-secondary">
-                Description (optional)
-              </label>
-              <textarea
-                id="task-description"
-                rows={2}
-                placeholder="Details, checklist, or acceptance criteria..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+            <DialogFooter className="flex justify-end gap-2 border-t border-border/40 pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
                 disabled={isLoading}
-                maxLength={2000}
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-          </div>
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="default"
+                disabled={isLoading}
+                className="bg-primary text-primary-foreground hover:bg-primary-hover font-semibold"
+              >
+                {isLoading ? "Guardando..." : taskToEdit ? "Actualizar Tarea" : "Crear Tarea"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <DialogFooter className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="default"
-              disabled={isLoading}
-              className="bg-primary text-primary-foreground hover:bg-primary-hover"
-            >
-              {isLoading ? "Saving..." : taskToEdit ? "Update Task" : "Create Task"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {/* Settings Dialog for Custom Status & Priority */}
+      <TaskStatusPriorityConfigDialog
+        projectId={projectId}
+        isOpen={isConfigOpen}
+        onOpenChange={setIsConfigOpen}
+        currentStatuses={statuses}
+        currentPriorities={priorities}
+        onSaved={(newStatuses, newPriorities) => {
+          setStatuses(newStatuses);
+          setPriorities(newPriorities);
+        }}
+      />
+    </>
   );
 }

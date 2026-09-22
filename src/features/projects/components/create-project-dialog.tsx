@@ -15,6 +15,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { createProject } from "../api/project-mutations";
 
+import { IconPlus } from "@tabler/icons-react";
+
 export interface CreateProjectDialogProps {
   readonly trigger?: React.ReactNode;
 }
@@ -32,7 +34,7 @@ export function CreateProjectDialog({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Project name is required (at least 3 characters)");
+      setError("El nombre del proyecto es obligatorio (mínimo 3 caracteres)");
       return;
     }
 
@@ -56,7 +58,7 @@ export function CreateProjectDialog({
       router.push(`/projects/${result.data.id}`);
       router.refresh();
     } catch {
-      setError("An unexpected error occurred while creating project");
+      setError("Ocurrió un error inesperado al crear el proyecto");
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +69,8 @@ export function CreateProjectDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary-hover">
-            + New Project
+            <IconPlus className="size-3.5 mr-1" />
+            Nuevo Proyecto
           </Button>
         )}
       </DialogTrigger>
@@ -75,10 +78,10 @@ export function CreateProjectDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-text-primary">
-              Create New Project
+              Crear Nuevo Proyecto
             </DialogTitle>
             <DialogDescription className="text-sm text-text-secondary">
-              Set up a collaborative workspace for your team and timeline.
+              Configura un espacio de trabajo colaborativo para tu equipo y cronograma.
             </DialogDescription>
           </DialogHeader>
 
@@ -91,12 +94,12 @@ export function CreateProjectDialog({
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="project-name" className="text-xs font-medium text-text-secondary">
-                Project Name *
+                Nombre del Proyecto *
               </label>
               <Input
                 id="project-name"
                 type="text"
-                placeholder="e.g. Website Redesign Q3"
+                placeholder="ej. Rediseño Web Q3"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isLoading}
@@ -109,12 +112,12 @@ export function CreateProjectDialog({
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="project-desc" className="text-xs font-medium text-text-secondary">
-                Description (optional)
+                Descripción (opcional)
               </label>
               <textarea
                 id="project-desc"
                 rows={3}
-                placeholder="Briefly describe the scope or goal..."
+                placeholder="Describe brevemente el alcance o meta..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isLoading}
@@ -131,7 +134,7 @@ export function CreateProjectDialog({
               onClick={() => setIsOpen(false)}
               disabled={isLoading}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               type="submit"
@@ -139,7 +142,7 @@ export function CreateProjectDialog({
               disabled={isLoading}
               className="bg-primary text-primary-foreground hover:bg-primary-hover"
             >
-              {isLoading ? "Creating..." : "Create Project"}
+              {isLoading ? "Creando..." : "Crear Proyecto"}
             </Button>
           </DialogFooter>
         </form>

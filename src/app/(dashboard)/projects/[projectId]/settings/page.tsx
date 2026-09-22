@@ -26,13 +26,13 @@ export default async function ProjectSettingsPage({
   }
 
   return (
-    <div className="flex flex-col gap-8 max-w-4xl">
+    <div className="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-8">
       <div>
         <h2 className="text-lg font-semibold text-text-primary">
-          Project Settings & Team
+          Ajustes del Proyecto y Equipo
         </h2>
         <p className="text-xs text-text-secondary mt-0.5">
-          Configure project details, manage access, and invite collaborators.
+          Configura los detalles del proyecto, administra los roles e invita colaboradores.
         </p>
       </div>
 

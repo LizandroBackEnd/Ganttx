@@ -21,12 +21,20 @@ export interface ProjectMemberDTO {
   readonly image: string | null;
 }
 
+export interface ProjectCustomOption {
+  readonly id: string;
+  readonly label: string;
+  readonly color?: string;
+}
+
 export interface ProjectDetailDTO {
   readonly id: string;
   readonly name: string;
   readonly description: string | null;
   readonly currentUserRole: ProjectRole;
   readonly members: readonly ProjectMemberDTO[];
+  readonly customStatuses?: readonly ProjectCustomOption[] | null;
+  readonly customPriorities?: readonly ProjectCustomOption[] | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }

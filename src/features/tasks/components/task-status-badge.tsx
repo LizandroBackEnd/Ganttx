@@ -3,28 +3,31 @@ import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export interface TaskStatusBadgeProps {
-  readonly status: TaskStatus;
+  readonly status: string;
   readonly className?: string;
 }
 
-const statusStyles: Record<TaskStatus, string> = {
-  TODO: "bg-surface-elevated text-text-secondary border-border",
-  IN_PROGRESS: "bg-primary/10 text-primary border-primary/20",
-  IN_REVIEW: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  DONE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  CANCELLED: "bg-destructive/10 text-destructive border-destructive/20 line-through",
+const statusStyles: Record<string, string> = {
+  TODO: "bg-surface-elevated text-text-secondary border-border/80",
+  IN_PROGRESS: "bg-gradient-to-r from-sky-500/15 to-blue-500/15 text-sky-300 border-sky-500/30",
+  IN_REVIEW: "bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-300 border-amber-500/30",
+  DONE: "bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-300 border-emerald-500/30",
+  CANCELLED: "bg-gradient-to-r from-rose-500/15 to-red-500/15 text-rose-400 border-rose-500/30 line-through",
 };
 
 export function TaskStatusBadge({
   status,
   className,
 }: TaskStatusBadgeProps): React.JSX.Element {
+  const label = TASK_STATUS_LABELS[status as TaskStatus] ?? status;
+  const style = statusStyles[status] ?? "bg-primary/10 text-primary border-primary/30";
+
   return (
     <Badge
       variant="outline"
-      className={cn("text-[11px] font-medium tracking-tight", statusStyles[status], className)}
+      className={cn("text-[11px] font-medium tracking-tight", style, className)}
     >
-      {TASK_STATUS_LABELS[status]}
+      {label}
     </Badge>
   );
 }

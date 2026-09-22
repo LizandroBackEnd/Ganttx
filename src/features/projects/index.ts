@@ -7,3 +7,6 @@ export * from "./components/invite-member-dialog";
 export * from "./components/project-members-table";
 export * from "./components/project-settings-form";
 export * from "./components/project-workspace";
+export * from "./components/project-nav-tabs";
+export * from "./components/project-sidebar";
+export * from "./components/project-back-button";

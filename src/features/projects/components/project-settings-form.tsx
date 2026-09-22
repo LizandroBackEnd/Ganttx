@@ -33,7 +33,7 @@ export function ProjectSettingsForm({
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!name.trim()) {
-      setMessage({ type: "error", text: "Project name is required" });
+      setMessage({ type: "error", text: "El nombre del proyecto es obligatorio" });
       return;
     }
 
@@ -51,17 +51,17 @@ export function ProjectSettingsForm({
         return;
       }
 
-      setMessage({ type: "success", text: "Project updated successfully" });
+      setMessage({ type: "success", text: "Proyecto actualizado correctamente" });
       router.refresh();
     } catch {
-      setMessage({ type: "error", text: "Failed to update project" });
+      setMessage({ type: "error", text: "Error al actualizar el proyecto" });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!confirm("Are you sure? This will permanently delete the project and all its tasks.")) {
+    if (!confirm("¿Estás seguro? Esta acción eliminará permanentemente el proyecto y todas sus tareas.")) {
       return;
     }
 
@@ -76,7 +76,7 @@ export function ProjectSettingsForm({
       router.push("/");
       router.refresh();
     } catch {
-      alert("Failed to delete project");
+      alert("Error al eliminar el proyecto");
       setIsDeleting(false);
     }
   };
@@ -85,9 +85,9 @@ export function ProjectSettingsForm({
     <div className="flex flex-col gap-6">
       {/* General Settings */}
       <form onSubmit={handleUpdate} className="rounded-xl border border-border bg-surface p-6">
-        <h3 className="text-base font-semibold text-text-primary">General Settings</h3>
+        <h3 className="text-base font-semibold text-text-primary">Ajustes Generales</h3>
         <p className="text-xs text-text-secondary mt-1">
-          Update the display name and description of this workspace.
+          Actualiza el nombre para mostrar y la descripción de este espacio de trabajo.
         </p>
 
         {message && (
@@ -105,7 +105,7 @@ export function ProjectSettingsForm({
         <div className="mt-5 flex flex-col gap-4 max-w-lg">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="settings-project-name" className="text-xs font-medium text-text-secondary">
-              Project Name
+              Nombre del Proyecto
             </label>
             <Input
               id="settings-project-name"
@@ -122,7 +122,7 @@ export function ProjectSettingsForm({
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="settings-project-desc" className="text-xs font-medium text-text-secondary">
-              Description
+              Descripción
             </label>
             <textarea
               id="settings-project-desc"
@@ -143,7 +143,7 @@ export function ProjectSettingsForm({
                 disabled={isSaving}
                 className="bg-primary text-primary-foreground hover:bg-primary-hover text-xs"
               >
-                {isSaving ? "Saving..." : "Save Changes"}
+                {isSaving ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </div>
           )}
@@ -153,9 +153,9 @@ export function ProjectSettingsForm({
       {/* Danger Zone */}
       {canDelete && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
-          <h3 className="text-base font-semibold text-destructive">Danger Zone</h3>
+          <h3 className="text-base font-semibold text-destructive">Zona de Peligro</h3>
           <p className="text-xs text-text-secondary mt-1">
-            Permanently delete this project and all associated tasks and timelines. This cannot be undone.
+            Elimina permanentemente este proyecto y todas sus tareas asociadas. Esta acción no se puede deshacer.
           </p>
 
           <div className="mt-5">
@@ -166,7 +166,7 @@ export function ProjectSettingsForm({
               onClick={handleDelete}
               className="text-xs"
             >
-              {isDeleting ? "Deleting..." : "Delete Project"}
+              {isDeleting ? "Eliminando..." : "Eliminar Proyecto"}
             </Button>
           </div>
         </div>

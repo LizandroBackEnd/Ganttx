@@ -8,16 +8,21 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        default:
+          "bg-gradient-to-r from-[#00f28e] via-[#00e588] to-[#00d47e] text-[#04120a] font-bold shadow-md shadow-emerald-500/20 hover:from-[#00ff9d] hover:to-[#00f28e] hover:shadow-emerald-500/35 hover:brightness-105 active:scale-[0.98]",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-border bg-surface-elevated/40 text-text-primary hover:bg-surface-elevated hover:border-primary/40 hover:text-text-primary aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-surface-elevated text-text-primary hover:bg-surface-elevated/80 aria-expanded:bg-surface-elevated",
         ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "hover:bg-surface-elevated hover:text-text-primary aria-expanded:bg-surface-elevated",
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+          "bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 focus-visible:ring-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
+        gradientBlue:
+          "bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 text-white font-bold shadow-md shadow-blue-500/20 hover:brightness-105 active:scale-[0.98]",
+        gradientOrange:
+          "bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 text-white font-bold shadow-md shadow-orange-500/20 hover:brightness-105 active:scale-[0.98]",
       },
       size: {
         default:

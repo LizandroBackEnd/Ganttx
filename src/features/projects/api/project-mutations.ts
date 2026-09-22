@@ -25,14 +25,14 @@ export async function createProject(
   if (!parsed.success) {
     return {
       success: false,
-      error: "Validation failed",
+      error: "Error de validación",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "No autorizado" };
   }
 
   const userId = session.user.id;
@@ -61,7 +61,7 @@ export async function createProject(
     revalidatePath("/");
     return { success: true, data: { id: project.id } };
   } catch {
-    return { success: false, error: "Failed to create project" };
+    return { success: false, error: "Error al crear el proyecto" };
   }
 }
 
@@ -72,14 +72,14 @@ export async function updateProject(
   if (!parsed.success) {
     return {
       success: false,
-      error: "Validation failed",
+      error: "Error de validación",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "No autorizado" };
   }
 
   const userId = session.user.id;
@@ -94,7 +94,7 @@ export async function updateProject(
   });
 
   if (!member || (member.role !== "OWNER" && member.role !== "ADMIN")) {
-    return { success: false, error: "Permission denied: admin role required" };
+    return { success: false, error: "Permiso denegado: se requiere rol de administrador" };
   }
 
   try {
@@ -110,7 +110,7 @@ export async function updateProject(
     revalidatePath(`/projects/${projectId}`);
     return { success: true, data: undefined };
   } catch {
-    return { success: false, error: "Failed to update project" };
+    return { success: false, error: "Error al actualizar el proyecto" };
   }
 }
 
@@ -121,14 +121,14 @@ export async function deleteProject(
   if (!parsed.success) {
     return {
       success: false,
-      error: "Validation failed",
+      error: "Error de validación",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "No autorizado" };
   }
 
   const userId = session.user.id;
@@ -143,7 +143,7 @@ export async function deleteProject(
   });
 
   if (!member || member.role !== "OWNER") {
-    return { success: false, error: "Permission denied: only the owner can delete a project" };
+    return { success: false, error: "Permiso denegado: solo el propietario puede eliminar el proyecto" };
   }
 
   try {
@@ -154,7 +154,7 @@ export async function deleteProject(
     revalidatePath("/");
     return { success: true, data: undefined };
   } catch {
-    return { success: false, error: "Failed to delete project" };
+    return { success: false, error: "Error al eliminar el proyecto" };
   }
 }
 
@@ -165,14 +165,14 @@ export async function inviteMember(
   if (!parsed.success) {
     return {
       success: false,
-      error: "Validation failed",
+      error: "Error de validación",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "No autorizado" };
   }
 
   const callerId = session.user.id;
@@ -187,7 +187,7 @@ export async function inviteMember(
   });
 
   if (!callerMembership || (callerMembership.role !== "OWNER" && callerMembership.role !== "ADMIN")) {
-    return { success: false, error: "Permission denied: admin role required to invite members" };
+    return { success: false, error: "Permiso denegado: se requiere rol de administrador para invitar miembros" };
   }
 
   // Find target user by email
@@ -199,7 +199,7 @@ export async function inviteMember(
   if (!targetUser) {
     return {
       success: false,
-      error: "No registered user found with that email address",
+      error: "No se encontró ningún usuario registrado con ese correo electrónico",
     };
   }
 
@@ -212,7 +212,7 @@ export async function inviteMember(
   });
 
   if (existingMembership) {
-    return { success: false, error: "User is already a member of this project" };
+    return { success: false, error: "El usuario ya es miembro de este proyecto" };
   }
 
   try {
@@ -228,7 +228,7 @@ export async function inviteMember(
     revalidatePath(`/projects/${projectId}/settings`);
     return { success: true, data: undefined };
   } catch {
-    return { success: false, error: "Failed to invite member" };
+    return { success: false, error: "Error al invitar al miembro" };
   }
 }
 
@@ -239,14 +239,14 @@ export async function removeMember(
   if (!parsed.success) {
     return {
       success: false,
-      error: "Validation failed",
+      error: "Error de validación",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "No autorizado" };
   }
 
   const callerId = session.user.id;
@@ -261,7 +261,7 @@ export async function removeMember(
   });
 
   if (!caller || (caller.role !== "OWNER" && caller.role !== "ADMIN")) {
-    return { success: false, error: "Permission denied: admin role required" };
+    return { success: false, error: "Permiso denegado: se requiere rol de administrador" };
   }
 
   // Target member role
@@ -273,15 +273,15 @@ export async function removeMember(
   });
 
   if (!target) {
-    return { success: false, error: "Member not found in project" };
+    return { success: false, error: "Miembro no encontrado en el proyecto" };
   }
 
   if (target.role === "OWNER") {
-    return { success: false, error: "Cannot remove project owner" };
+    return { success: false, error: "No se puede eliminar al propietario del proyecto" };
   }
 
   if (caller.role === "ADMIN" && target.role === "ADMIN") {
-    return { success: false, error: "Admins cannot remove other admins" };
+    return { success: false, error: "Los administradores no pueden eliminar a otros administradores" };
   }
 
   try {
@@ -295,6 +295,6 @@ export async function removeMember(
     revalidatePath(`/projects/${projectId}/settings`);
     return { success: true, data: undefined };
   } catch {
-    return { success: false, error: "Failed to remove member" };
+    return { success: false, error: "Error al eliminar al miembro" };
   }
 }

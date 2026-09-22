@@ -10,11 +10,14 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6 mb-8">
         <div>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 mb-1 inline-block">
+            Espacio de Trabajo
+          </span>
           <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-            Projects
+            Tus <span className="text-gradient-emerald">Proyectos</span>
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Manage your project workspaces, timelines, and team members.
+            Administra tus espacios de trabajo, cronogramas y miembros del equipo.
           </p>
         </div>
 
@@ -29,15 +32,16 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           ))}
         </div>
       ) : (
-        <div className="flex min-h-100 flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-surface/30 p-12 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-surface-elevated text-primary mb-4 border border-border">
-            <IconFolders className="size-7" />
+        <div className="flex min-h-100 flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-surface/30 p-12 text-center relative overflow-hidden">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none -z-10" />
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-surface-elevated text-emerald-400 mb-4 border border-emerald-500/30 shadow-[0_0_20px_rgba(0,242,142,0.15)]">
+            <IconFolders className="size-8" />
           </div>
           <h2 className="text-xl font-semibold text-text-primary">
-            No projects yet
+            Aún no hay proyectos
           </h2>
           <p className="mt-2 max-w-sm text-sm text-text-secondary">
-            Get started by creating your first project workspace to track milestones, tasks, and visual Gantt charts.
+            Comienza creando tu primer espacio de trabajo para planificar hitos, tareas y diagramas de Gantt visuales.
           </p>
           <div className="mt-6">
             <CreateProjectDialog />

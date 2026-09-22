@@ -23,10 +23,10 @@ export type TaskPriority =
   (typeof TASK_PRIORITIES)[keyof typeof TASK_PRIORITIES];
 
 export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
-  LOW: "Low",
-  MEDIUM: "Medium",
-  HIGH: "High",
-  URGENT: "Urgent",
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  URGENT: "Urgente",
 };
 
 export const TASK_PRIORITY_ORDER: Record<TaskPriority, number> = {
@@ -47,9 +47,9 @@ export const TASK_STATUSES = {
 export type TaskStatus = (typeof TASK_STATUSES)[keyof typeof TASK_STATUSES];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  TODO: "To Do",
-  IN_PROGRESS: "In Progress",
-  IN_REVIEW: "In Review",
-  DONE: "Done",
-  CANCELLED: "Cancelled",
+  TODO: "Por Hacer",
+  IN_PROGRESS: "En Progreso",
+  IN_REVIEW: "En Revisión",
+  DONE: "Completada",
+  CANCELLED: "Cancelada",
 };

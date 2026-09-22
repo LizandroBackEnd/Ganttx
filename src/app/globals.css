@@ -7,7 +7,7 @@
 
 /* ───────────────────────────────────────────
  * Ganttx Design System Tokens
- * Architecture § 7.1 — Code Verse dark theme
+ * Architecture — Code Verse dark gradient theme
  * ─────────────────────────────────────────── */
 @theme {
   /* Fonts */
@@ -15,42 +15,43 @@
   --font-heading: "Montserrat Alternates", var(--font-montserrat-alternates), sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 
-  /* Surfaces */
-  --color-background: #050d09;
-  --color-surface: #0a1a10;
-  --color-surface-elevated: #0f2618;
-  --color-border: #163b24;
-  --color-border-subtle: #0f2a18;
+  /* Surfaces — Clean Deep Charcoal & Slate */
+  --color-background: #08090d;
+  --color-surface: #10131a;
+  --color-surface-elevated: #161b24;
+  --color-border: #1f2633;
+  --color-border-subtle: #171d27;
 
-  /* Primary */
-  --color-primary: #00d47e;
-  --color-primary-hover: #00f28e;
-  --color-primary-muted: #0a4d30;
-  --color-primary-foreground: #ffffff;
+  /* Primary Accent — Code Verse Neon Mint / Emerald */
+  --color-primary: #00f28e;
+  --color-primary-hover: #00ff9d;
+  --color-primary-muted: #064e3b;
+  --color-primary-foreground: #04120a;
 
   /* Text */
-  --color-text-primary: #f0fdf4;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
 
-  /* Semantic */
-  --color-success: #22c55e;
+  /* Semantic / Multi-accent gradients */
+  --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-  --color-info: #06b6d4;
+  --color-info: #0ea5e9;
   --color-accent-orange: #f97316;
+  --color-accent-purple: #a855f7;
 
   /* Priority */
-  --color-priority-low: #22c55e;
-  --color-priority-med: #f59e0b;
+  --color-priority-low: #10b981;
+  --color-priority-med: #0ea5e9;
   --color-priority-high: #f97316;
   --color-priority-urg: #ef4444;
 
   /* Status */
-  --color-status-todo: #6b7280;
-  --color-status-progress: #06b6d4;
+  --color-status-todo: #64748b;
+  --color-status-progress: #0ea5e9;
   --color-status-review: #f59e0b;
-  --color-status-done: #22c55e;
+  --color-status-done: #10b981;
   --color-status-cancelled: #ef4444;
 
   /* Radius */
@@ -62,8 +63,6 @@
 
 /* ───────────────────────────────────────────
  * shadcn/ui token bridge
- * Maps shadcn CSS variables to Ganttx tokens
- * so shadcn primitives render correctly
  * ─────────────────────────────────────────── */
 @theme inline {
   --font-heading: var(--font-sans);
@@ -100,45 +99,71 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ───────────────────────────────────────────
- * Ganttx is dark-only. We remap shadcn's
- * CSS variables to our dark palette directly
- * in :root (no .dark class toggle needed).
- * ─────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
   /* shadcn core — mapped to Ganttx dark palette */
-  --background: #050d09;
-  --foreground: #f0fdf4;
-  --card: #0a1a10;
-  --card-foreground: #f0fdf4;
-  --popover: #0a1a10;
-  --popover-foreground: #f0fdf4;
-  --primary: #00d47e;
-  --primary-foreground: #ffffff;
-  --secondary: #0f2618;
-  --secondary-foreground: #f0fdf4;
-  --muted: #0f2618;
-  --muted-foreground: #9ca3af;
-  --accent: #0f2618;
-  --accent-foreground: #f0fdf4;
+  --background: #08090d;
+  --foreground: #f8fafc;
+  --card: #10131a;
+  --card-foreground: #f8fafc;
+  --popover: #10131a;
+  --popover-foreground: #f8fafc;
+  --primary: #00f28e;
+  --primary-foreground: #04120a;
+  --secondary: #161b24;
+  --secondary-foreground: #f8fafc;
+  --muted: #161b24;
+  --muted-foreground: #94a3b8;
+  --accent: #161b24;
+  --accent-foreground: #f8fafc;
   --destructive: #ef4444;
-  --border: #163b24;
-  --input: #163b24;
-  --ring: #00d47e;
-  --chart-1: #00d47e;
-  --chart-2: #06b6d4;
+  --border: #1f2633;
+  --input: #1f2633;
+  --ring: #00f28e;
+  --chart-1: #00f28e;
+  --chart-2: #0ea5e9;
   --chart-3: #f59e0b;
   --chart-4: #f97316;
   --chart-5: #ef4444;
-  --radius: 0.625rem;
-  --sidebar: #0a1a10;
-  --sidebar-foreground: #f0fdf4;
-  --sidebar-primary: #00d47e;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #0f2618;
-  --sidebar-accent-foreground: #f0fdf4;
-  --sidebar-border: #163b24;
-  --sidebar-ring: #00d47e;
+  --radius: 0.75rem;
+  --sidebar: #10131a;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #00f28e;
+  --sidebar-primary-foreground: #04120a;
+  --sidebar-accent: #161b24;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1f2633;
+  --sidebar-ring: #00f28e;
+}
+
+@utility text-gradient-emerald {
+  background: linear-gradient(135deg, #34d399 0%, #00f28e 50%, #00d47e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-blue {
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 50%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-orange {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ef4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility glow-emerald {
+  box-shadow: 0 0 25px -4px rgba(0, 242, 142, 0.35);
+}
+
+@utility glow-blue {
+  box-shadow: 0 0 25px -4px rgba(14, 165, 233, 0.35);
+}
+
+@utility glow-orange {
+  box-shadow: 0 0 25px -4px rgba(249, 115, 22, 0.35);
 }
 
 @layer base {

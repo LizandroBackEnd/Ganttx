@@ -34,7 +34,7 @@ export default async function DashboardLayout({
               href="/"
               className="text-text-secondary transition-colors hover:text-text-primary"
             >
-              Projects
+              Proyectos
             </Link>
           </nav>
         </div>

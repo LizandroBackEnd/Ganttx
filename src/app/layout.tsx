@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ganttx — Collaborative Project Management",
+  title: "Ganttx — Gestión de Proyectos Colaborativa",
   description:
-    "Real-time collaborative project management with interactive Gantt charts and calendar views.",
+    "Gestión de proyectos en tiempo real con cronogramas Gantt interactivos y vistas de calendario.",
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
 }): React.JSX.Element {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${montserratAlternates.variable} ${montserratAlternates.className} ${geistMono.variable} h-full antialiased`}
     >
       <head>

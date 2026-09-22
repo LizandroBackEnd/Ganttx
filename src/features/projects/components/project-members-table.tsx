@@ -29,7 +29,7 @@ export function ProjectMembersTable({
   const isPrivileged = currentUserRole === "OWNER" || currentUserRole === "ADMIN";
 
   const handleRemove = async (userId: string, email: string): Promise<void> => {
-    if (!confirm(`Are you sure you want to remove ${email} from this project?`)) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar a ${email} de este proyecto?`)) {
       return;
     }
 
@@ -42,7 +42,7 @@ export function ProjectMembersTable({
       }
       router.refresh();
     } catch {
-      alert("Failed to remove member");
+      alert("Error al eliminar miembro");
     } finally {
       setRemovingId(null);
     }
@@ -52,9 +52,9 @@ export function ProjectMembersTable({
     <div className="rounded-xl border border-border bg-surface overflow-hidden">
       <div className="flex items-center justify-between border-b border-border p-4 bg-surface-elevated/40">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Team Members</h3>
+          <h3 className="text-sm font-semibold text-text-primary">Miembros del Equipo</h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            {members.length} {members.length === 1 ? "person has" : "people have"} access to this project.
+            {members.length} {members.length === 1 ? "persona tiene" : "personas tienen"} acceso a este proyecto.
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export function ProjectMembersTable({
                       {member.name ?? member.email}
                     </span>
                     {member.userId === currentUserId && (
-                      <span className="text-[10px] text-text-muted">(you)</span>
+                      <span className="text-[10px] text-text-muted">(tú)</span>
                     )}
                   </div>
                   <span className="text-xs text-text-secondary truncate block">
@@ -111,7 +111,7 @@ export function ProjectMembersTable({
                   variant="outline"
                   className="text-[10px] font-mono uppercase tracking-wider text-text-secondary border-border"
                 >
-                  {member.role}
+                  {member.role === "OWNER" ? "PROPIETARIO" : member.role === "ADMIN" ? "ADMIN" : "MIEMBRO"}
                 </Badge>
 
                 {canRemove && (
@@ -122,7 +122,7 @@ export function ProjectMembersTable({
                     onClick={() => handleRemove(member.userId, member.email)}
                     className="text-xs text-destructive hover:bg-destructive/10"
                   >
-                    {removingId === member.userId ? "Removing..." : "Remove"}
+                    {removingId === member.userId ? "Eliminando..." : "Eliminar"}
                   </Button>
                 )}
               </div>

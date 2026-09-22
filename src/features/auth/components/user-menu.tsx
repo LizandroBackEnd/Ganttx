@@ -45,7 +45,7 @@ export function UserMenu({ user }: UserMenuProps): React.JSX.Element {
         className="text-xs text-text-muted hover:text-text-primary gap-1"
       >
         <IconLogout className="size-3.5" />
-        <span>Sign Out</span>
+        <span>Cerrar sesión</span>
       </Button>
     </div>
   );

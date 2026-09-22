@@ -106,11 +106,13 @@ model VerificationToken {
 // ─────────────────────────────────────────────
 
 model Project {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(100)
+  description      String?  @db.Text
+  customStatuses   Json?    @map("custom_statuses")
+  customPriorities Json?    @map("custom_priorities")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   members ProjectMember[]
   tasks   Task[]
@@ -135,27 +137,36 @@ model ProjectMember {
 }
 
 model Task {
-  id          String       @id @default(uuid()) @db.Uuid
-  title       String       @db.VarChar(255)
-  description String?      @db.Text
-  priority    TaskPriority @default(MEDIUM)
-  status      TaskStatus   @default(TODO)
-  progress    Int          @default(0) @db.SmallInt
-  startDate   DateTime     @map("start_date") @db.Date
-  dueDate     DateTime     @map("due_date") @db.Date
-  projectId   String       @map("project_id") @db.Uuid
-  assigneeId  String?      @map("assignee_id") @db.Uuid
-  creatorId   String       @map("creator_id") @db.Uuid
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  id           String    @id @default(uuid()) @db.Uuid
+  customId     String?   @map("custom_id") @db.VarChar(50)
+  title        String    @db.VarChar(255)
+  description  String?   @db.Text
+  requirement  String?   @map("requirement") @db.VarChar(50)
+  sprint       String?   @map("sprint") @db.VarChar(50)
+  durationDays Int?      @map("duration_days") @db.SmallInt
+  priority     String    @default("MEDIUM") @db.VarChar(50)
+  status       String    @default("TODO") @db.VarChar(50)
+  startDate    DateTime  @map("start_date") @db.Date
+  dueDate      DateTime  @map("due_date") @db.Date
+  predecessors String?   @map("predecessors") @db.Text
+  isEpic       Boolean   @default(false) @map("is_epic")
+  parentId     String?   @map("parent_id") @db.Uuid
+  projectId    String    @map("project_id") @db.Uuid
+  assigneeId   String?   @map("assignee_id") @db.Uuid
+  creatorId    String    @map("creator_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  creator  User    @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator  User     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  parent   Task?    @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks Task[]   @relation("TaskHierarchy")
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([creatorId])
+  @@index([parentId])
   @@index([projectId, status])
   @@index([projectId, startDate])
   @@index([projectId, dueDate])

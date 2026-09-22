@@ -22,7 +22,7 @@ export function DateNavigator({
         <button
           type="button"
           onClick={onPrevious}
-          aria-label="Previous date range"
+          aria-label="Rango de fechas anterior"
           className="flex size-7 items-center justify-center rounded-md text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
         >
           <IconChevronLeft className="size-4" />
@@ -35,13 +35,13 @@ export function DateNavigator({
           onClick={onToday}
           className="h-7 px-2.5 text-xs text-text-primary hover:bg-surface-elevated font-medium"
         >
-          Today
+          Hoy
         </Button>
 
         <button
           type="button"
           onClick={onNext}
-          aria-label="Next date range"
+          aria-label="Rango de fechas siguiente"
           className="flex size-7 items-center justify-center rounded-md text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
         >
           <IconChevronRight className="size-4" />

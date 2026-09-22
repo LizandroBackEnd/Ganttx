@@ -2,15 +2,17 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import type { TaskDTO } from "../types/task.types";
-import type { TaskStatus } from "@/lib/constants";
 
 export interface GetTasksFilter {
-  readonly status?: TaskStatus;
+  readonly status?: string;
   readonly assigneeId?: string;
 }
 
-function formatDateToIsoString(date: Date): string {
-  return date.toISOString().split("T")[0] ?? "";
+function formatLocalDateToIsoString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export async function getTasksByProjectId(
@@ -44,13 +46,31 @@ export async function getTasksByProjectId(
     },
     select: {
       id: true,
+      customId: true,
       title: true,
       description: true,
+      requirement: true,
+      sprint: true,
+      durationDays: true,
       priority: true,
       status: true,
-      progress: true,
       startDate: true,
       dueDate: true,
+      predecessors: true,
+      isEpic: true,
+      parentId: true,
+      parent: {
+        select: {
+          id: true,
+          title: true,
+          customId: true,
+        },
+      },
+      _count: {
+        select: {
+          subtasks: true,
+        },
+      },
       projectId: true,
       assigneeId: true,
       creatorId: true,
@@ -66,6 +86,7 @@ export async function getTasksByProjectId(
       },
     },
     orderBy: [
+      { isEpic: "desc" },
       { startDate: "asc" },
       { createdAt: "asc" },
     ],
@@ -73,13 +94,27 @@ export async function getTasksByProjectId(
 
   return tasks.map((t) => ({
     id: t.id,
+    customId: t.customId,
     title: t.title,
     description: t.description,
+    requirement: t.requirement,
+    sprint: t.sprint,
+    durationDays: t.durationDays,
     priority: t.priority,
     status: t.status,
-    progress: t.progress,
-    startDate: formatDateToIsoString(t.startDate),
-    dueDate: formatDateToIsoString(t.dueDate),
+    startDate: formatLocalDateToIsoString(t.startDate),
+    dueDate: formatLocalDateToIsoString(t.dueDate),
+    predecessors: t.predecessors,
+    isEpic: t.isEpic,
+    parentId: t.parentId,
+    parent: t.parent
+      ? {
+          id: t.parent.id,
+          title: t.parent.title,
+          customId: t.parent.customId,
+        }
+      : null,
+    subtasksCount: t._count.subtasks,
     projectId: t.projectId,
     assigneeId: t.assigneeId,
     creatorId: t.creatorId,
@@ -108,13 +143,31 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
     where: { id: taskId },
     select: {
       id: true,
+      customId: true,
       title: true,
       description: true,
+      requirement: true,
+      sprint: true,
+      durationDays: true,
       priority: true,
       status: true,
-      progress: true,
       startDate: true,
       dueDate: true,
+      predecessors: true,
+      isEpic: true,
+      parentId: true,
+      parent: {
+        select: {
+          id: true,
+          title: true,
+          customId: true,
+        },
+      },
+      _count: {
+        select: {
+          subtasks: true,
+        },
+      },
       projectId: true,
       assigneeId: true,
       creatorId: true,
@@ -145,13 +198,27 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
 
   return {
     id: task.id,
+    customId: task.customId,
     title: task.title,
     description: task.description,
+    requirement: task.requirement,
+    sprint: task.sprint,
+    durationDays: task.durationDays,
     priority: task.priority,
     status: task.status,
-    progress: task.progress,
-    startDate: formatDateToIsoString(task.startDate),
-    dueDate: formatDateToIsoString(task.dueDate),
+    startDate: formatLocalDateToIsoString(task.startDate),
+    dueDate: formatLocalDateToIsoString(task.dueDate),
+    predecessors: task.predecessors,
+    isEpic: task.isEpic,
+    parentId: task.parentId,
+    parent: task.parent
+      ? {
+          id: task.parent.id,
+          title: task.parent.title,
+          customId: task.parent.customId,
+        }
+      : null,
+    subtasksCount: task._count.subtasks,
     projectId: task.projectId,
     assigneeId: task.assigneeId,
     creatorId: task.creatorId,

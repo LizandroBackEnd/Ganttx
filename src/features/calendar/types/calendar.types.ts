@@ -1,10 +1,9 @@
 import type { TaskDTO } from "@/features/tasks";
 
+export type CalendarSubViewMode = "month" | "week" | "day" | "year";
+
 export type CalendarViewMode =
-  | "month"
-  | "week"
-  | "day"
-  | "year"
+  | CalendarSubViewMode
   | "tasks"
   | "gantt";
 

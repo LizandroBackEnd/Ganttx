@@ -60,7 +60,7 @@ export function GoogleSignInButton({
       onClick={handleSignIn}
     >
       <GoogleIcon />
-      <span>{isLoading ? "Connecting to Google..." : "Sign in with Google"}</span>
+      <span>{isLoading ? "Conectando con Google..." : "Continuar con Google"}</span>
     </Button>
   );
 }

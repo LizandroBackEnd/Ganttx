@@ -1,19 +1,17 @@
 "use client";
 
-import type { CalendarViewMode } from "../types/calendar.types";
+import type { CalendarSubViewMode } from "../types/calendar.types";
 
 export interface ViewSwitcherProps {
-  readonly currentView: CalendarViewMode;
-  readonly onViewChange: (view: CalendarViewMode) => void;
+  readonly currentView: CalendarSubViewMode;
+  readonly onViewChange: (view: CalendarSubViewMode) => void;
 }
 
-const views: { id: CalendarViewMode; label: string }[] = [
-  { id: "month", label: "Month" },
-  { id: "week", label: "Week" },
-  { id: "day", label: "Day" },
-  { id: "year", label: "Year" },
-  { id: "tasks", label: "Tasks" },
-  { id: "gantt", label: "Gantt Timeline" },
+const views: { id: CalendarSubViewMode; label: string }[] = [
+  { id: "month", label: "Mes" },
+  { id: "week", label: "Semana" },
+  { id: "day", label: "Día" },
+  { id: "year", label: "Año" },
 ];
 
 export function ViewSwitcher({
@@ -29,10 +27,10 @@ export function ViewSwitcher({
             key={view.id}
             type="button"
             onClick={() => onViewChange(view.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
+            className={`rounded-lg px-3 py-1 text-xs transition-all whitespace-nowrap ${
               isActive
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                : "text-text-secondary hover:text-text-primary hover:bg-surface-elevated"
+                ? "bg-primary text-primary-foreground font-semibold shadow-xs scale-[1.02]"
+                : "text-text-secondary hover:text-text-primary hover:bg-surface-elevated font-medium"
             }`}
           >
             {view.label}

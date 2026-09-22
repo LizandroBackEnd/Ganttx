@@ -6,34 +6,57 @@ import { TaskFormDialog, type ProjectMemberOption } from "./task-form-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { IconInbox, IconPlus, IconSearch } from "@tabler/icons-react";
-import type { TaskDTO } from "../types/task.types";
-import type { TaskStatus } from "@/lib/constants";
+import type {
+  TaskDTO,
+  TaskParentDTO,
+  CustomStatusOption,
+  CustomPriorityOption,
+} from "../types/task.types";
 
 export interface TaskTableProps {
   readonly projectId: string;
   readonly tasks: readonly TaskDTO[];
   readonly members?: readonly ProjectMemberOption[];
+  readonly availableEpics?: readonly TaskParentDTO[];
+  readonly customStatuses?: readonly CustomStatusOption[] | null;
+  readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly canEdit?: boolean;
 }
-
-type FilterTab = "ALL" | TaskStatus;
-
-const filterTabs: { id: FilterTab; label: string }[] = [
-  { id: "ALL", label: "All Tasks" },
-  { id: "TODO", label: "To Do" },
-  { id: "IN_PROGRESS", label: "In Progress" },
-  { id: "IN_REVIEW", label: "In Review" },
-  { id: "DONE", label: "Done" },
-];
 
 export function TaskTable({
   projectId,
   tasks,
   members = [],
+  availableEpics: propEpics,
+  customStatuses,
+  customPriorities,
   canEdit = true,
 }: TaskTableProps): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
+  const [activeTab, setActiveTab] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const availableEpics = useMemo<TaskParentDTO[]>(() => {
+    if (propEpics) return [...propEpics];
+    return tasks
+      .filter((t) => t.isEpic)
+      .map((t) => ({ id: t.id, title: t.title, customId: t.customId }));
+  }, [propEpics, tasks]);
+
+  const filterTabs = useMemo<{ id: string; label: string }[]>(() => {
+    if (customStatuses && customStatuses.length > 0) {
+      return [
+        { id: "ALL", label: "Todas" },
+        ...customStatuses.map((s) => ({ id: s.id, label: s.label })),
+      ];
+    }
+    return [
+      { id: "ALL", label: "Todas" },
+      { id: "TODO", label: "Por Hacer" },
+      { id: "IN_PROGRESS", label: "En Progreso" },
+      { id: "IN_REVIEW", label: "En Revisión" },
+      { id: "DONE", label: "Completadas" },
+    ];
+  }, [customStatuses]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -88,7 +111,7 @@ export function TaskTable({
             <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-text-muted" />
             <Input
               type="search"
-              placeholder="Search tasks..."
+              placeholder="Buscar tareas..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-8 w-44 md:w-56 pl-8 text-xs border-border bg-background"
@@ -99,10 +122,13 @@ export function TaskTable({
             <TaskFormDialog
               projectId={projectId}
               members={members}
+              availableEpics={availableEpics}
+              customStatuses={customStatuses}
+              customPriorities={customPriorities}
               trigger={
                 <Button size="sm" variant="default" className="bg-primary text-primary-foreground hover:bg-primary-hover shrink-0">
                   <IconPlus className="size-3.5 mr-1" />
-                  New Task
+                  Nueva Tarea
                 </Button>
               }
             />
@@ -118,6 +144,9 @@ export function TaskTable({
               key={task.id}
               task={task}
               members={members}
+              availableEpics={availableEpics}
+              customStatuses={customStatuses}
+              customPriorities={customPriorities}
               canEdit={canEdit}
             />
           ))
@@ -126,21 +155,24 @@ export function TaskTable({
             <div className="flex size-10 items-center justify-center rounded-xl bg-surface-elevated text-text-muted mb-3">
               <IconInbox className="size-5" />
             </div>
-            <h4 className="text-sm font-semibold text-text-primary">No tasks found</h4>
+            <h4 className="text-sm font-semibold text-text-primary">No se encontraron tareas</h4>
             <p className="mt-1 text-xs text-text-secondary max-w-xs">
               {searchQuery
-                ? "No tasks match your search filter."
-                : "No tasks in this status yet."}
+                ? "No hay tareas que coincidan con la búsqueda."
+                : "Aún no hay tareas en este estado."}
             </p>
             {canEdit && !searchQuery && (
               <div className="mt-4">
                 <TaskFormDialog
                   projectId={projectId}
                   members={members}
+                  availableEpics={availableEpics}
+                  customStatuses={customStatuses}
+                  customPriorities={customPriorities}
                   trigger={
                     <Button size="sm" variant="outline" className="border-border">
                       <IconPlus className="size-3.5 mr-1" />
-                      Create First Task
+                      Crear Primera Tarea
                     </Button>
                   }
                 />

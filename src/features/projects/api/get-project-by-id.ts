@@ -37,6 +37,8 @@ export async function getProjectById(
       description: true,
       createdAt: true,
       updatedAt: true,
+      customStatuses: true,
+      customPriorities: true,
       members: {
         select: {
           role: true,
@@ -74,6 +76,12 @@ export async function getProjectById(
       email: m.user.email,
       image: m.user.image,
     })),
+    customStatuses: project.customStatuses
+      ? (project.customStatuses as unknown as ProjectDetailDTO["customStatuses"])
+      : null,
+    customPriorities: project.customPriorities
+      ? (project.customPriorities as unknown as ProjectDetailDTO["customPriorities"])
+      : null,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
   };
