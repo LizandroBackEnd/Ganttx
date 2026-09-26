@@ -81,18 +81,25 @@ export async function createTask(
     return { success: false, error: "Permiso denegado: debes ser miembro del proyecto" };
   }
 
-  // Validación: si es subtarea, la fecha de inicio no puede ser anterior a la de la tarea principal
+  // Validación: si es subtarea, las fechas deben estar dentro del rango de la tarea principal
   if (parentId) {
     const parent = await prisma.task.findUnique({
       where: { id: parentId },
-      select: { startDate: true },
+      select: { startDate: true, dueDate: true },
     });
     if (parent) {
       const parentStartIso = formatLocalDateToIso(parent.startDate);
+      const parentDueIso = formatLocalDateToIso(parent.dueDate);
       if (startDate < parentStartIso) {
         return {
           success: false,
           error: `La fecha de inicio de la subtarea (${startDate}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+        };
+      }
+      if (dueDate > parentDueIso) {
+        return {
+          success: false,
+          error: `La fecha de fin de la subtarea (${dueDate}) no puede ser posterior a la de la tarea principal (${parentDueIso})`,
         };
       }
     }
@@ -137,6 +144,7 @@ export async function createTask(
             id: true,
             title: true,
             startDate: true,
+            dueDate: true,
           },
         },
         assignee: {
@@ -168,6 +176,7 @@ export async function createTask(
             id: task.parent.id,
             title: task.parent.title,
             startDate: formatLocalDateToIso(task.parent.startDate),
+            dueDate: formatLocalDateToIso(task.parent.dueDate),
           }
         : null,
       projectId: task.projectId,
@@ -211,6 +220,8 @@ export async function updateTask(
     select: {
       projectId: true,
       parentId: true,
+      startDate: true,
+      dueDate: true,
       project: {
         select: {
           members: {
@@ -232,18 +243,28 @@ export async function updateTask(
     return { success: false, error: "Una subtarea no puede ser marcada como EPIC" };
   }
 
-  // Validación: una subtarea no puede tener la fecha de inicio antes que la tarea principal
-  if (effectiveParentId && fields.startDate !== undefined) {
+  // Validación: una subtarea debe estar dentro del rango de fechas de la tarea principal
+  if (effectiveParentId && (fields.startDate !== undefined || fields.dueDate !== undefined)) {
     const parent = await prisma.task.findUnique({
       where: { id: effectiveParentId },
-      select: { startDate: true },
+      select: { startDate: true, dueDate: true },
     });
     if (parent) {
       const parentStartIso = formatLocalDateToIso(parent.startDate);
-      if (fields.startDate < parentStartIso) {
+      const parentDueIso = formatLocalDateToIso(parent.dueDate);
+      const candidateStart = fields.startDate ?? formatLocalDateToIso(task.startDate);
+      const candidateDue = fields.dueDate ?? formatLocalDateToIso(task.dueDate);
+
+      if (candidateStart < parentStartIso) {
         return {
           success: false,
-          error: `La fecha de inicio de la subtarea (${fields.startDate}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+          error: `La fecha de inicio de la subtarea (${candidateStart}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+        };
+      }
+      if (candidateDue > parentDueIso) {
+        return {
+          success: false,
+          error: `La fecha de fin de la subtarea (${candidateDue}) no puede ser posterior a la de la tarea principal (${parentDueIso})`,
         };
       }
     }
@@ -307,7 +328,7 @@ export async function updateTaskDates(
       projectId: true,
       parentId: true,
       parent: {
-        select: { startDate: true },
+        select: { startDate: true, dueDate: true },
       },
       project: {
         select: {
@@ -324,13 +345,20 @@ export async function updateTaskDates(
     return { success: false, error: "Permiso denegado" };
   }
 
-  // Validación: si es subtarea, no puede iniciar antes que la tarea principal
-  if (task.parentId && task.parent?.startDate) {
+  // Validación: si es subtarea, no puede estar fuera del rango de la tarea principal
+  if (task.parentId && task.parent?.startDate && task.parent?.dueDate) {
     const parentStartIso = formatLocalDateToIso(task.parent.startDate);
+    const parentDueIso = formatLocalDateToIso(task.parent.dueDate);
     if (startDate < parentStartIso) {
       return {
         success: false,
         error: `La fecha de inicio de la subtarea no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+      };
+    }
+    if (dueDate > parentDueIso) {
+      return {
+        success: false,
+        error: `La fecha de fin de la subtarea no puede ser posterior a la de la tarea principal (${parentDueIso})`,
       };
     }
   }
@@ -587,7 +615,7 @@ export async function createSubtask(input: {
 
     const now = new Date();
     const startDate = parent?.startDate ?? now;
-    const dueDate = parent?.dueDate ?? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const dueDate = parent?.dueDate ?? startDate;
     const subtaskLabel = input.label?.trim() || parent?.label || "MEDIUM";
 
     const subtask = await prisma.task.create({
@@ -693,6 +721,7 @@ export async function getTaskDetails(
             id: true,
             title: true,
             startDate: true,
+            dueDate: true,
           },
         },
         assignee: {
@@ -755,6 +784,7 @@ export async function getTaskDetails(
             id: task.parent.id,
             title: task.parent.title,
             startDate: formatLocalDateToIso(task.parent.startDate),
+            dueDate: formatLocalDateToIso(task.parent.dueDate),
           }
         : null,
       projectId: task.projectId,

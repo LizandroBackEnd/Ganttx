@@ -25,6 +25,7 @@ export interface TaskParentDTO {
   readonly id: string;
   readonly title: string;
   readonly startDate?: string;
+  readonly dueDate?: string;
 }
 
 export interface TaskDTO {

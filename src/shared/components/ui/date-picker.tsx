@@ -14,6 +14,7 @@ export interface DatePickerProps {
   readonly disabled?: boolean;
   readonly required?: boolean;
   readonly minDate?: string; // ISO format "YYYY-MM-DD"
+  readonly maxDate?: string; // ISO format "YYYY-MM-DD"
   readonly className?: string;
 }
 
@@ -39,6 +40,7 @@ export function DatePicker({
   placeholder = "Seleccionar fecha...",
   disabled = false,
   minDate,
+  maxDate,
   className,
 }: DatePickerProps): React.JSX.Element {
   const generatedId = useId();
@@ -99,7 +101,7 @@ export function DatePicker({
         isCurrentMonth: false,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
-        isDisabled: Boolean(minDate && dateString < minDate),
+        isDisabled: Boolean((minDate && dateString < minDate) || (maxDate && dateString > maxDate)),
       });
     }
 
@@ -112,7 +114,7 @@ export function DatePicker({
         isCurrentMonth: true,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
-        isDisabled: Boolean(minDate && dateString < minDate),
+        isDisabled: Boolean((minDate && dateString < minDate) || (maxDate && dateString > maxDate)),
       });
     }
 
@@ -129,12 +131,12 @@ export function DatePicker({
         isCurrentMonth: false,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
-        isDisabled: Boolean(minDate && dateString < minDate),
+        isDisabled: Boolean((minDate && dateString < minDate) || (maxDate && dateString > maxDate)),
       });
     }
 
     return result;
-  }, [year, month, value, minDate]);
+  }, [year, month, value, minDate, maxDate]);
 
   const handlePrevMonth = (): void => {
     setViewDate(new Date(year, month - 1, 1));
@@ -146,6 +148,7 @@ export function DatePicker({
 
   const handleSelect = (dateString: string): void => {
     if (minDate && dateString < minDate) return;
+    if (maxDate && dateString > maxDate) return;
     onChange(dateString);
     setIsOpen(false);
   };
@@ -158,6 +161,12 @@ export function DatePicker({
       const parsedMin = parseIso(minDate);
       if (parsedMin) {
         setViewDate(new Date(parsedMin.year, parsedMin.month, 1));
+      }
+    } else if (maxDate && todayIso > maxDate) {
+      onChange(maxDate);
+      const parsedMax = parseIso(maxDate);
+      if (parsedMax) {
+        setViewDate(new Date(parsedMax.year, parsedMax.month, 1));
       }
     } else {
       setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));

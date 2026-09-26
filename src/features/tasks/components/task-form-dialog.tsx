@@ -79,6 +79,7 @@ export interface TaskFormDialogProps {
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
   readonly parentStartDate?: string;
+  readonly parentDueDate?: string;
 }
 
 function formatLocalDate(d: Date): string {
@@ -127,6 +128,7 @@ interface TaskFormContentProps {
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
   readonly parentStartDate?: string;
+  readonly parentDueDate?: string;
 }
 
 function TaskFormContent({
@@ -142,6 +144,7 @@ function TaskFormContent({
   isSubtask: isSubtaskProp,
   parentTitle,
   parentStartDate,
+  parentDueDate,
 }: TaskFormContentProps): React.JSX.Element {
   const router = useRouter();
   const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
@@ -151,6 +154,8 @@ function TaskFormContent({
   );
   const effectiveParentStartDate =
     parentStartDate || initialTask?.parent?.startDate || currentTask?.parent?.startDate;
+  const effectiveParentDueDate =
+    parentDueDate || initialTask?.parent?.dueDate || currentTask?.parent?.dueDate;
 
   // Form State initialized directly from initialTask
   const [title, setTitle] = useState<string>(initialTask?.title ?? "");
@@ -652,6 +657,7 @@ function TaskFormContent({
               id="task-start"
               value={startDate}
               minDate={isSubtask ? effectiveParentStartDate : undefined}
+              maxDate={isSubtask ? (effectiveParentDueDate || dueDate) : undefined}
               onChange={(newStart) => {
                 if (isSubtask && effectiveParentStartDate && newStart < effectiveParentStartDate) {
                   sileo.error({
@@ -660,8 +666,20 @@ function TaskFormContent({
                   });
                   return;
                 }
+                if (isSubtask && effectiveParentDueDate && newStart > effectiveParentDueDate) {
+                  sileo.error({
+                    title: "Fecha de inicio no permitida",
+                    description: `Una subtarea no puede iniciar después del límite de la tarea principal (${effectiveParentDueDate}).`,
+                  });
+                  return;
+                }
+                if (newStart > dueDate) {
+                  setDueDate(newStart);
+                  triggerImmediateSave({ startDate: newStart, dueDate: newStart });
+                } else {
+                  triggerImmediateSave({ startDate: newStart });
+                }
                 setStartDate(newStart);
-                triggerImmediateSave({ startDate: newStart });
               }}
               required
             />
@@ -675,7 +693,22 @@ function TaskFormContent({
               id="task-due"
               value={dueDate}
               minDate={startDate}
+              maxDate={isSubtask ? effectiveParentDueDate : undefined}
               onChange={(newDue) => {
+                if (isSubtask && effectiveParentDueDate && newDue > effectiveParentDueDate) {
+                  sileo.error({
+                    title: "Fecha de fin no permitida",
+                    description: `Una subtarea no puede terminar después de la tarea principal (${effectiveParentDueDate}). Puede terminar el mismo día o antes.`,
+                  });
+                  return;
+                }
+                if (newDue < startDate) {
+                  sileo.error({
+                    title: "Fecha de fin no permitida",
+                    description: "La fecha de fin no puede ser anterior a la fecha de inicio.",
+                  });
+                  return;
+                }
                 setDueDate(newDue);
                 triggerImmediateSave({ dueDate: newDue });
               }}
@@ -982,6 +1015,7 @@ function TaskFormContent({
         isSubtask
         parentTitle={currentTask?.title || initialTask?.title || parentTitle}
         parentStartDate={currentTask?.startDate || initialTask?.startDate || parentStartDate}
+        parentDueDate={currentTask?.dueDate || initialTask?.dueDate || parentDueDate}
         onOpenChangeControlled={(open) => {
           if (!open) {
             setSubtaskModalTask(null);
@@ -1034,6 +1068,7 @@ export function TaskFormDialog({
   isSubtask,
   parentTitle,
   parentStartDate,
+  parentDueDate,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
@@ -1058,6 +1093,7 @@ export function TaskFormDialog({
       <Dialog open={isOpen} onOpenChange={setOpen}>
         {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
         <DialogContent
+          overlayClassName={isSubtask ? "z-55" : undefined}
           className={cn(
             "border-border bg-surface w-[95vw] sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl min-h-[85vh] max-h-[94vh] overflow-y-auto p-6 sm:p-8 flex flex-col",
             isSubtask && "z-60"
@@ -1079,6 +1115,7 @@ export function TaskFormDialog({
               isSubtask={isSubtask}
               parentTitle={parentTitle}
               parentStartDate={parentStartDate}
+              parentDueDate={parentDueDate}
             />
           )}
         </DialogContent>
