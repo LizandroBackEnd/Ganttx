@@ -23,6 +23,7 @@ import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
 import { TaskCommentsPanel } from "./task-comments-panel";
+import { TaskPriorityBadge } from "./task-priority-badge";
 import {
   createTask,
   updateTask,
@@ -77,6 +78,7 @@ export interface TaskFormDialogProps {
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
+  readonly parentStartDate?: string;
 }
 
 function formatLocalDate(d: Date): string {
@@ -124,6 +126,7 @@ interface TaskFormContentProps {
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
+  readonly parentStartDate?: string;
 }
 
 function TaskFormContent({
@@ -134,11 +137,11 @@ function TaskFormContent({
   availableEpics,
   priorities,
   customStatuses,
-  customPriorities,
   onOpenConfig,
   onTaskCreatedOrUpdated,
   isSubtask: isSubtaskProp,
   parentTitle,
+  parentStartDate,
 }: TaskFormContentProps): React.JSX.Element {
   const router = useRouter();
   const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
@@ -146,6 +149,8 @@ function TaskFormContent({
   const isSubtask = Boolean(
     isSubtaskProp || initialTask?.parentId || currentTask?.parentId
   );
+  const effectiveParentStartDate =
+    parentStartDate || initialTask?.parent?.startDate || currentTask?.parent?.startDate;
 
   // Form State initialized directly from initialTask
   const [title, setTitle] = useState<string>(initialTask?.title ?? "");
@@ -173,6 +178,7 @@ function TaskFormContent({
   const [isAddingSubtask, setIsAddingSubtask] = useState<boolean>(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState<string>("");
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>("");
+  const [newSubtaskLabel, setNewSubtaskLabel] = useState<string>("");
   const [isSavingSubtask, setIsSavingSubtask] = useState<boolean>(false);
 
   // Subtask modal state
@@ -225,6 +231,7 @@ function TaskFormContent({
     }
 
     const titleToUse = newSubtaskTitle.trim() || "Nueva subtarea";
+    const labelToUse = newSubtaskLabel || label || priorities[0]?.id || "MEDIUM";
     setIsSavingSubtask(true);
     try {
       const res = await createSubtask({
@@ -232,12 +239,14 @@ function TaskFormContent({
         projectId,
         title: titleToUse,
         assigneeId: newSubtaskAssigneeId || null,
+        label: labelToUse,
       });
 
       if (res.success && res.data) {
         setSubtasks((prev) => [...prev, res.data]);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
+        setNewSubtaskLabel("");
         setIsAddingSubtask(false);
         router.refresh();
         await handleOpenSubtaskModal(res.data.id);
@@ -260,6 +269,7 @@ function TaskFormContent({
 
   const handleAddSubtask = async (): Promise<void> => {
     if (!newSubtaskTitle.trim() || !currentTask?.id) return;
+    const labelToUse = newSubtaskLabel || label || priorities[0]?.id || "MEDIUM";
     setIsSavingSubtask(true);
     try {
       const res = await createSubtask({
@@ -267,11 +277,13 @@ function TaskFormContent({
         projectId,
         title: newSubtaskTitle.trim(),
         assigneeId: newSubtaskAssigneeId || null,
+        label: labelToUse,
       });
       if (res.success && res.data) {
         setSubtasks((prev) => [...prev, res.data]);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
+        setNewSubtaskLabel("");
         setIsAddingSubtask(false);
         router.refresh();
       } else {
@@ -350,18 +362,29 @@ function TaskFormContent({
         });
 
         if (res.success) {
+          const updatedDto = {
+            ...(currentTask ?? initialTask),
+            ...updates,
+          } as TaskDTO;
+          setCurrentTask(updatedDto);
+          onTaskCreatedOrUpdated?.(updatedDto);
           setSaveState("saved");
           setTimeout(() => setSaveState("idle"), 1800);
           router.refresh();
         } else {
           setSaveState("error");
+          sileo.error({
+            title: "Error al guardar",
+            description: res.error,
+          });
         }
       } catch {
         setSaveState("error");
       }
     },
     [
-      currentTask?.id,
+      currentTask,
+      initialTask,
       title,
       projectId,
       bucket,
@@ -628,7 +651,15 @@ function TaskFormContent({
             <DatePicker
               id="task-start"
               value={startDate}
+              minDate={isSubtask ? effectiveParentStartDate : undefined}
               onChange={(newStart) => {
+                if (isSubtask && effectiveParentStartDate && newStart < effectiveParentStartDate) {
+                  sileo.error({
+                    title: "Fecha de inicio no permitida",
+                    description: `Una subtarea no puede iniciar antes que la tarea principal (${effectiveParentStartDate}). Puede iniciar el mismo día o después.`,
+                  });
+                  return;
+                }
                 setStartDate(newStart);
                 triggerImmediateSave({ startDate: newStart });
               }}
@@ -643,6 +674,7 @@ function TaskFormContent({
             <DatePicker
               id="task-due"
               value={dueDate}
+              minDate={startDate}
               onChange={(newDue) => {
                 setDueDate(newDue);
                 triggerImmediateSave({ dueDate: newDue });
@@ -753,8 +785,9 @@ function TaskFormContent({
 
               {/* Header de columnas */}
               <div className="grid grid-cols-12 px-3 py-2 text-xs font-semibold text-text-primary border-b border-border/60">
-                <div className="col-span-7 sm:col-span-8">Título</div>
-                <div className="col-span-5 sm:col-span-4">Personas asignadas</div>
+                <div className="col-span-5 sm:col-span-5">Título</div>
+                <div className="col-span-3 sm:col-span-3">Etiqueta</div>
+                <div className="col-span-4 sm:col-span-4">Personas asignadas</div>
               </div>
 
               {/* Lista de subtareas existentes */}
@@ -765,14 +798,20 @@ function TaskFormContent({
                     className="grid grid-cols-12 items-center px-3 py-2 text-xs hover:bg-surface-elevated/40 transition-colors group"
                   >
                     <div
-                      className="col-span-7 sm:col-span-8 flex items-center gap-2 truncate pr-2 cursor-pointer"
+                      className="col-span-5 sm:col-span-5 flex items-center gap-2 truncate pr-2 cursor-pointer"
                       onClick={() => void handleOpenSubtaskModal(st.id)}
                     >
                       <span className="text-text-primary truncate hover:text-primary transition-colors font-medium">
                         {st.title}
                       </span>
                     </div>
-                    <div className="col-span-5 sm:col-span-4 flex items-center justify-between">
+                    <div className="col-span-3 sm:col-span-3 flex items-center">
+                      <TaskPriorityBadge
+                        label={st.label}
+                        customPriorities={priorities}
+                      />
+                    </div>
+                    <div className="col-span-4 sm:col-span-4 flex items-center justify-between">
                       <span className="text-text-secondary truncate text-[11px]">
                         {st.assignee?.name || st.assignee?.email || "Sin asignar"}
                       </span>
@@ -802,7 +841,7 @@ function TaskFormContent({
                 {/* Inline Add Row */}
                 {isAddingSubtask ? (
                   <div className="grid grid-cols-12 items-center gap-2 px-3 py-2 bg-surface-elevated/20">
-                    <div className="col-span-7 sm:col-span-8">
+                    <div className="col-span-5 sm:col-span-5">
                       <input
                         type="text"
                         autoFocus
@@ -817,12 +856,42 @@ function TaskFormContent({
                             setIsAddingSubtask(false);
                             setNewSubtaskTitle("");
                             setNewSubtaskAssigneeId("");
+                            setNewSubtaskLabel("");
                           }
                         }}
                         className="w-full text-xs bg-background border border-primary/50 rounded-lg px-2.5 py-1 text-text-primary focus:outline-none"
                       />
                     </div>
-                    <div className="col-span-5 sm:col-span-4 flex items-center gap-1.5">
+                    <div className="col-span-3 sm:col-span-3">
+                      <Select
+                        value={newSubtaskLabel || label || priorities[0]?.id || "MEDIUM"}
+                        onValueChange={setNewSubtaskLabel}
+                      >
+                        <SelectTrigger className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-text-primary">
+                          <SelectValue placeholder="Etiqueta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {priorities.map((pr) => {
+                            const prColor = pr.color || "#0284c7";
+                            return (
+                              <SelectItem key={pr.id} value={pr.id}>
+                                <span
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border"
+                                  style={{
+                                    backgroundColor: `${prColor}22`,
+                                    color: prColor,
+                                    borderColor: `${prColor}55`,
+                                  }}
+                                >
+                                  {pr.label}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-4 sm:col-span-4 flex items-center gap-1.5">
                       <div className="flex-1 min-w-0">
                         <Select
                           value={newSubtaskAssigneeId || "UNASSIGNED"}
@@ -907,11 +976,12 @@ function TaskFormContent({
         members={members}
         availableEpics={availableEpics}
         customStatuses={customStatuses}
-        customPriorities={customPriorities}
+        customPriorities={priorities}
         taskToEdit={subtaskModalTask}
         isOpenControlled={Boolean(subtaskModalTask)}
         isSubtask
         parentTitle={currentTask?.title || initialTask?.title || parentTitle}
+        parentStartDate={currentTask?.startDate || initialTask?.startDate || parentStartDate}
         onOpenChangeControlled={(open) => {
           if (!open) {
             setSubtaskModalTask(null);
@@ -932,6 +1002,7 @@ function TaskFormContent({
                     ...s,
                     title: updatedTask.title,
                     bucket: updatedTask.bucket,
+                    label: updatedTask.label,
                     assigneeId: updatedTask.assigneeId,
                     assignee: updatedTask.assignee,
                   }
@@ -962,6 +1033,7 @@ export function TaskFormDialog({
   onTaskCreatedOrUpdated,
   isSubtask,
   parentTitle,
+  parentStartDate,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
@@ -1006,6 +1078,7 @@ export function TaskFormDialog({
               onTaskCreatedOrUpdated={onTaskCreatedOrUpdated}
               isSubtask={isSubtask}
               parentTitle={parentTitle}
+              parentStartDate={parentStartDate}
             />
           )}
         </DialogContent>

@@ -13,6 +13,7 @@ export interface DatePickerProps {
   readonly placeholder?: string;
   readonly disabled?: boolean;
   readonly required?: boolean;
+  readonly minDate?: string; // ISO format "YYYY-MM-DD"
   readonly className?: string;
 }
 
@@ -37,6 +38,7 @@ export function DatePicker({
   onChange,
   placeholder = "Seleccionar fecha...",
   disabled = false,
+  minDate,
   className,
 }: DatePickerProps): React.JSX.Element {
   const generatedId = useId();
@@ -80,6 +82,7 @@ export function DatePicker({
       isCurrentMonth: boolean;
       isToday: boolean;
       isSelected: boolean;
+      isDisabled: boolean;
     }[] = [];
 
     // Previous month padding
@@ -96,6 +99,7 @@ export function DatePicker({
         isCurrentMonth: false,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
+        isDisabled: Boolean(minDate && dateString < minDate),
       });
     }
 
@@ -108,6 +112,7 @@ export function DatePicker({
         isCurrentMonth: true,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
+        isDisabled: Boolean(minDate && dateString < minDate),
       });
     }
 
@@ -124,11 +129,12 @@ export function DatePicker({
         isCurrentMonth: false,
         isToday: dateString === todayIso,
         isSelected: dateString === value,
+        isDisabled: Boolean(minDate && dateString < minDate),
       });
     }
 
     return result;
-  }, [year, month, value]);
+  }, [year, month, value, minDate]);
 
   const handlePrevMonth = (): void => {
     setViewDate(new Date(year, month - 1, 1));
@@ -139,6 +145,7 @@ export function DatePicker({
   };
 
   const handleSelect = (dateString: string): void => {
+    if (minDate && dateString < minDate) return;
     onChange(dateString);
     setIsOpen(false);
   };
@@ -146,8 +153,16 @@ export function DatePicker({
   const handleToday = (): void => {
     const today = new Date();
     const todayIso = formatIso(today.getFullYear(), today.getMonth(), today.getDate());
-    setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
-    onChange(todayIso);
+    if (minDate && todayIso < minDate) {
+      onChange(minDate);
+      const parsedMin = parseIso(minDate);
+      if (parsedMin) {
+        setViewDate(new Date(parsedMin.year, parsedMin.month, 1));
+      }
+    } else {
+      setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+      onChange(todayIso);
+    }
     setIsOpen(false);
   };
 
@@ -223,11 +238,14 @@ export function DatePicker({
             <button
               key={cell.dateString}
               type="button"
-              onClick={() => handleSelect(cell.dateString)}
+              disabled={cell.isDisabled}
+              onClick={() => !cell.isDisabled && handleSelect(cell.dateString)}
               className={cn(
                 "flex size-7.5 items-center justify-center rounded-md text-xs font-mono transition-all",
-                cell.isSelected
-                  ? "bg-gradient-to-r from-[#00f28e] to-[#00d47e] text-[#04120a] font-bold shadow-[0_0_12px_rgba(0,242,142,0.35)] scale-105"
+                cell.isDisabled
+                  ? "opacity-25 cursor-not-allowed text-text-muted hover:bg-transparent"
+                  : cell.isSelected
+                  ? "bg-linear-to-r from-[#00f28e] to-[#00d47e] text-[#04120a] font-bold shadow-[0_0_12px_rgba(0,242,142,0.35)] scale-105"
                   : cell.isToday
                   ? "border border-primary/50 text-primary font-semibold hover:bg-surface-elevated"
                   : cell.isCurrentMonth

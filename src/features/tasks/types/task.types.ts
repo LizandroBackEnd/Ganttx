@@ -24,6 +24,7 @@ export type CustomLabelOption = CustomPriorityOption;
 export interface TaskParentDTO {
   readonly id: string;
   readonly title: string;
+  readonly startDate?: string;
 }
 
 export interface TaskDTO {
@@ -53,6 +54,7 @@ export interface SubtaskDTO {
   readonly id: string;
   readonly title: string;
   readonly bucket: string;
+  readonly label?: string;
   readonly assigneeId: string | null;
   readonly assignee: TaskAssigneeDTO | null;
 }

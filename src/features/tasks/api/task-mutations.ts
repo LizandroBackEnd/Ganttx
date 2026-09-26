@@ -81,6 +81,23 @@ export async function createTask(
     return { success: false, error: "Permiso denegado: debes ser miembro del proyecto" };
   }
 
+  // Validación: si es subtarea, la fecha de inicio no puede ser anterior a la de la tarea principal
+  if (parentId) {
+    const parent = await prisma.task.findUnique({
+      where: { id: parentId },
+      select: { startDate: true },
+    });
+    if (parent) {
+      const parentStartIso = formatLocalDateToIso(parent.startDate);
+      if (startDate < parentStartIso) {
+        return {
+          success: false,
+          error: `La fecha de inicio de la subtarea (${startDate}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+        };
+      }
+    }
+  }
+
   try {
     const task = await prisma.task.create({
       data: {
@@ -119,6 +136,7 @@ export async function createTask(
           select: {
             id: true,
             title: true,
+            startDate: true,
           },
         },
         assignee: {
@@ -145,7 +163,13 @@ export async function createTask(
       showSubtasksOnCard: task.showSubtasksOnCard,
       subtasks: [],
       parentId: task.parentId,
-      parent: task.parent,
+      parent: task.parent
+        ? {
+            id: task.parent.id,
+            title: task.parent.title,
+            startDate: formatLocalDateToIso(task.parent.startDate),
+          }
+        : null,
       projectId: task.projectId,
       assigneeId: task.assigneeId,
       creatorId: task.creatorId,
@@ -208,6 +232,23 @@ export async function updateTask(
     return { success: false, error: "Una subtarea no puede ser marcada como EPIC" };
   }
 
+  // Validación: una subtarea no puede tener la fecha de inicio antes que la tarea principal
+  if (effectiveParentId && fields.startDate !== undefined) {
+    const parent = await prisma.task.findUnique({
+      where: { id: effectiveParentId },
+      select: { startDate: true },
+    });
+    if (parent) {
+      const parentStartIso = formatLocalDateToIso(parent.startDate);
+      if (fields.startDate < parentStartIso) {
+        return {
+          success: false,
+          error: `La fecha de inicio de la subtarea (${fields.startDate}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+        };
+      }
+    }
+  }
+
   try {
     await prisma.task.update({
       where: { id: taskId },
@@ -264,6 +305,10 @@ export async function updateTaskDates(
     where: { id: taskId },
     select: {
       projectId: true,
+      parentId: true,
+      parent: {
+        select: { startDate: true },
+      },
       project: {
         select: {
           members: {
@@ -277,6 +322,17 @@ export async function updateTaskDates(
 
   if (!task || task.project.members.length === 0) {
     return { success: false, error: "Permiso denegado" };
+  }
+
+  // Validación: si es subtarea, no puede iniciar antes que la tarea principal
+  if (task.parentId && task.parent?.startDate) {
+    const parentStartIso = formatLocalDateToIso(task.parent.startDate);
+    if (startDate < parentStartIso) {
+      return {
+        success: false,
+        error: `La fecha de inicio de la subtarea no puede ser anterior a la de la tarea principal (${parentStartIso})`,
+      };
+    }
   }
 
   try {
@@ -476,6 +532,7 @@ export async function getSubtasks(
         id: true,
         title: true,
         bucket: true,
+        label: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -495,6 +552,7 @@ export async function getSubtasks(
         id: s.id,
         title: s.title,
         bucket: s.bucket,
+        label: s.label,
         assigneeId: s.assigneeId,
         assignee: s.assignee,
       })),
@@ -509,6 +567,7 @@ export async function createSubtask(input: {
   projectId: string;
   title: string;
   assigneeId?: string | null;
+  label?: string | null;
 }): Promise<TaskActionResult<SubtaskDTO>> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -523,12 +582,13 @@ export async function createSubtask(input: {
   try {
     const parent = await prisma.task.findUnique({
       where: { id: input.parentId },
-      select: { startDate: true, dueDate: true },
+      select: { startDate: true, dueDate: true, label: true },
     });
 
     const now = new Date();
     const startDate = parent?.startDate ?? now;
     const dueDate = parent?.dueDate ?? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const subtaskLabel = input.label?.trim() || parent?.label || "MEDIUM";
 
     const subtask = await prisma.task.create({
       data: {
@@ -537,7 +597,7 @@ export async function createSubtask(input: {
         parentId: input.parentId,
         title,
         bucket: "TODO",
-        label: "MEDIUM",
+        label: subtaskLabel,
         startDate,
         dueDate,
         assigneeId: input.assigneeId || null,
@@ -546,6 +606,7 @@ export async function createSubtask(input: {
         id: true,
         title: true,
         bucket: true,
+        label: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -566,6 +627,7 @@ export async function createSubtask(input: {
         id: subtask.id,
         title: subtask.title,
         bucket: subtask.bucket,
+        label: subtask.label,
         assigneeId: subtask.assigneeId,
         assignee: subtask.assignee,
       },
@@ -630,6 +692,7 @@ export async function getTaskDetails(
           select: {
             id: true,
             title: true,
+            startDate: true,
           },
         },
         assignee: {
@@ -645,6 +708,7 @@ export async function getTaskDetails(
             id: true,
             title: true,
             bucket: true,
+            label: true,
             assigneeId: true,
             assignee: {
               select: {
@@ -686,7 +750,13 @@ export async function getTaskDetails(
       isEpic: task.isEpic,
       showSubtasksOnCard: task.showSubtasksOnCard,
       parentId: task.parentId,
-      parent: task.parent,
+      parent: task.parent
+        ? {
+            id: task.parent.id,
+            title: task.parent.title,
+            startDate: formatLocalDateToIso(task.parent.startDate),
+          }
+        : null,
       projectId: task.projectId,
       assigneeId: task.assigneeId,
       creatorId: task.creatorId,
@@ -695,6 +765,7 @@ export async function getTaskDetails(
         id: st.id,
         title: st.title,
         bucket: st.bucket,
+        label: st.label,
         assigneeId: st.assigneeId,
         assignee: st.assignee,
       })),
