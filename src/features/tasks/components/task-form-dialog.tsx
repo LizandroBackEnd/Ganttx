@@ -25,6 +25,7 @@ import { TaskCommentsPanel } from "./task-comments-panel";
 import { TaskPriorityBadge, parseTaskLabels } from "./task-priority-badge";
 import { TaskLabelSelector } from "./task-label-selector";
 import { TaskPredecessorsSelector } from "./task-predecessors-selector";
+import { TaskMarkdownEditor } from "./task-markdown-editor";
 import {
   createTask,
   updateTask,
@@ -930,23 +931,19 @@ function TaskFormContent({
             )}
           </div>
 
-          {/* Tab 1: Descripción */}
+          {/* Tab 1: Descripción con Markdown enriquecido y Storage */}
           {currentActiveTab === "description" && (
             <div className="pt-3 flex-1 flex flex-col min-h-0">
-              <textarea
-                id="task-description"
-                placeholder="Agrega una descripción detallada o notas..."
+              <TaskMarkdownEditor
                 value={description}
-                onChange={(e) => {
-                  const next = e.target.value;
+                onChange={(next) => {
                   setDescription(next);
                   queueDebouncedSave({ description: next.trim() || null });
                 }}
                 onBlur={() => {
                   triggerImmediateSave({ description: description.trim() || null });
                 }}
-                maxLength={2000}
-                className="w-full flex-1 min-h-48 rounded-xl border border-border bg-background p-3.5 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none resize-none leading-relaxed"
+                placeholder="Escribe una descripción detallada en Markdown... Tip: Arrastra imágenes o documentos aquí, o pega capturas con Ctrl + V"
               />
             </div>
           )}

@@ -14,3 +14,5 @@ export * from "./components/task-comments-panel";
 export * from "./components/task-label-selector";
 export * from "./components/complete-task-confirm-toast";
 export * from "./components/task-predecessors-selector";
+export * from "./components/task-markdown-editor";
+export * from "./api/task-attachment-actions";
