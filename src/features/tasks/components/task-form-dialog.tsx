@@ -28,6 +28,7 @@ import { TaskLabelSelector } from "./task-label-selector";
 import {
   createTask,
   updateTask,
+  updateTaskStatus,
   getSubtasks,
   createSubtask,
   deleteSubtask,
@@ -259,11 +260,17 @@ function TaskFormContent({
       });
 
       if (res.success && res.data) {
-        setSubtasks((prev) => [...prev, res.data]);
+        const nextSubtasks = [...subtasks, res.data];
+        setSubtasks(nextSubtasks);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
         setNewSubtaskLabels([]);
         setIsAddingSubtask(false);
+        onTaskCreatedOrUpdated?.({
+          ...(currentTask ?? initialTask!),
+          subtasks: nextSubtasks,
+          subtasksCount: nextSubtasks.length,
+        });
         router.refresh();
         await handleOpenSubtaskModal(res.data.id);
       } else {
@@ -299,11 +306,17 @@ function TaskFormContent({
         label: labelToUse,
       });
       if (res.success && res.data) {
-        setSubtasks((prev) => [...prev, res.data]);
+        const nextSubtasks = [...subtasks, res.data];
+        setSubtasks(nextSubtasks);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
         setNewSubtaskLabels([]);
         setIsAddingSubtask(false);
+        onTaskCreatedOrUpdated?.({
+          ...(currentTask ?? initialTask!),
+          subtasks: nextSubtasks,
+          subtasksCount: nextSubtasks.length,
+        });
         router.refresh();
       } else {
         const errorMsg = !res.success ? res.error : "No se pudo crear la subtarea";
@@ -323,9 +336,80 @@ function TaskFormContent({
   };
 
   const handleDeleteSubtask = async (subtaskId: string): Promise<void> => {
-    setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
+    const nextSubtasks = subtasks.filter((s) => s.id !== subtaskId);
+    setSubtasks(nextSubtasks);
+    onTaskCreatedOrUpdated?.({
+      ...(currentTask ?? initialTask!),
+      subtasks: nextSubtasks,
+      subtasksCount: nextSubtasks.length,
+    });
     await deleteSubtask(subtaskId, projectId);
     router.refresh();
+  };
+
+  const handleToggleSubtaskCompletion = async (
+    subtaskId: string,
+    currentStatus: string
+  ): Promise<void> => {
+    const nextStatus = currentStatus === "DONE" ? "TODO" : "DONE";
+    const updated = subtasks.map((s) =>
+      s.id === subtaskId ? { ...s, bucket: nextStatus } : s
+    );
+    setSubtasks(updated);
+
+    try {
+      const res = await updateTaskStatus({
+        taskId: subtaskId,
+        bucket: nextStatus,
+      });
+
+      if (!res.success) {
+        setSubtasks(subtasks);
+        sileo.error({
+          title: "Error al actualizar subtarea",
+          description: res.error,
+        });
+        return;
+      }
+
+      // Si todas las subtareas están completadas en automático la tarea principal también se debe completar
+      const allCompleted =
+        updated.length > 0 && updated.every((s) => s.bucket === "DONE");
+
+      if (allCompleted && currentTask?.id && bucket !== "DONE") {
+        await updateTaskStatus({
+          taskId: currentTask.id,
+          bucket: "DONE",
+        });
+        const updatedTaskDto = {
+          ...(currentTask ?? initialTask!),
+          bucket: "DONE",
+          subtasks: updated,
+          subtasksCount: updated.length,
+        };
+        setCurrentTask(updatedTaskDto);
+        onTaskCreatedOrUpdated?.(updatedTaskDto);
+        sileo.success({
+          title: "Tarea completada",
+          description:
+            "Todas las subtareas fueron completadas, por lo que la tarea principal se marcó como completada.",
+        });
+      } else {
+        onTaskCreatedOrUpdated?.({
+          ...(currentTask ?? initialTask!),
+          subtasks: updated,
+          subtasksCount: updated.length,
+        });
+      }
+
+      router.refresh();
+    } catch {
+      setSubtasks(subtasks);
+      sileo.error({
+        title: "Error al actualizar subtarea",
+        description: "Ocurrió un error inesperado.",
+      });
+    }
   };
 
   // Send update or create on server
@@ -803,11 +887,30 @@ function TaskFormContent({
                     key={st.id}
                     className="grid grid-cols-12 items-center px-3 py-2 text-xs hover:bg-surface-elevated/40 transition-colors group"
                   >
-                    <div
-                      className="col-span-5 sm:col-span-5 flex items-center gap-2 truncate pr-2 cursor-pointer"
-                      onClick={() => void handleOpenSubtaskModal(st.id)}
-                    >
-                      <span className="text-text-primary truncate hover:text-primary transition-colors font-medium">
+                    <div className="col-span-5 sm:col-span-5 flex items-center gap-2.5 truncate pr-2">
+                      <button
+                        type="button"
+                        aria-label={st.bucket === "DONE" ? "Marcar como pendiente" : "Marcar como completada"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleToggleSubtaskCompletion(st.id, st.bucket);
+                        }}
+                        className={cn(
+                          "size-4 shrink-0 rounded flex items-center justify-center border transition-all cursor-pointer",
+                          st.bucket === "DONE"
+                            ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                            : "border-border hover:border-primary/60 bg-surface"
+                        )}
+                      >
+                        {st.bucket === "DONE" && <IconCheck className="size-2.5 stroke-3" />}
+                      </button>
+                      <span
+                        onClick={() => void handleOpenSubtaskModal(st.id)}
+                        className={cn(
+                          "truncate hover:text-primary transition-colors font-medium cursor-pointer flex-1",
+                          st.bucket === "DONE" && "line-through text-text-muted"
+                        )}
+                      >
                         {st.title}
                       </span>
                     </div>

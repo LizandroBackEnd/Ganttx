@@ -12,3 +12,4 @@ export * from "./components/task-status-priority-config-dialog";
 export * from "./components/delete-bucket-confirm-toast";
 export * from "./components/task-comments-panel";
 export * from "./components/task-label-selector";
+export * from "./components/complete-task-confirm-toast";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TaskPriorityBadge } from "./task-priority-badge";
@@ -15,8 +15,10 @@ import {
   IconCheck,
   IconFolder,
   IconTrash,
+  IconListCheck,
 } from "@tabler/icons-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { CompleteTaskConfirmToast } from "./complete-task-confirm-toast";
 import { cn } from "@/lib/utils";
 import { deleteTask, updateTask, updateTaskStatus } from "../api/task-mutations";
 import { sileo } from "sileo";
@@ -25,7 +27,6 @@ import type {
   CustomStatusOption,
   CustomPriorityOption,
   TaskAssigneeDTO,
-  SubtaskDTO,
 } from "../types/task.types";
 
 export interface TaskCardProps {
@@ -57,8 +58,166 @@ export function TaskCard({
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = useState<boolean>(false);
   const [isAssigning, setIsAssigning] = useState<boolean>(false);
 
-  // Optimistic Subtasks state
-  const [subtasks, setSubtasks] = useState<readonly SubtaskDTO[]>(task.subtasks ?? []);
+  // Optimistic Subtasks overrides
+  const [subtaskOverrides, setSubtaskOverrides] = useState<Record<string, string>>({});
+  const [taskBucketOverride, setTaskBucketOverride] = useState<string | null>(null);
+  const [prevTaskBucket, setPrevTaskBucket] = useState<string>(task.bucket);
+  const toastIdRef = useRef<string | null>(null);
+
+  if (task.bucket !== prevTaskBucket) {
+    setPrevTaskBucket(task.bucket);
+    setTaskBucketOverride(null);
+  }
+
+  const currentBucket = taskBucketOverride ?? task.bucket;
+  const isDone = currentBucket === "DONE";
+
+  const subtasks = (task.subtasks ?? []).map((st) => ({
+    ...st,
+    bucket: subtaskOverrides[st.id] ?? st.bucket,
+  }));
+
+  const pendingSubtasks = subtasks.filter((st) => st.bucket !== "DONE");
+  const completedCount = subtasks.filter((st) => st.bucket === "DONE").length;
+  const progressPercent =
+    subtasks.length > 0 ? Math.round((completedCount / subtasks.length) * 100) : 0;
+
+  const handleMainTaskCheckClick = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    if (isDone) {
+      const prevTaskBucketOverride = taskBucketOverride;
+      setTaskBucketOverride("TODO");
+      try {
+        const res = await updateTaskStatus({ taskId: task.id, bucket: "TODO" });
+        if (res.success) {
+          sileo.info({
+            title: "Tarea reabierta",
+            description: `"${task.title}" marcada como pendiente.`,
+          });
+          router.refresh();
+        } else {
+          setTaskBucketOverride(prevTaskBucketOverride);
+          sileo.error({
+            title: "Error al actualizar",
+            description: res.error,
+          });
+        }
+      } catch {
+        setTaskBucketOverride(prevTaskBucketOverride);
+        sileo.error({
+          title: "Error al actualizar",
+          description: "No se pudo actualizar el estado de la tarea.",
+        });
+      }
+      return;
+    }
+
+    // Completing task: check if there are pending subtasks
+    const pending = subtasks.filter((s) => s.bucket !== "DONE");
+    if (pending.length > 0) {
+      toastIdRef.current = sileo.action({
+        title: "¿Completar subtareas?",
+        duration: 15000,
+        autopilot: { expand: 40 },
+        description: (
+          <CompleteTaskConfirmToast
+            taskTitle={task.title}
+            pendingSubtasksCount={pending.length}
+            onCompleteAll={() => {
+              if (toastIdRef.current) {
+                sileo.dismiss(toastIdRef.current);
+                toastIdRef.current = null;
+              }
+              void handleCompleteTaskAndSubtasks();
+            }}
+            onCancel={() => {
+              if (toastIdRef.current) {
+                sileo.dismiss(toastIdRef.current);
+                toastIdRef.current = null;
+              }
+            }}
+          />
+        ),
+      });
+      return;
+    }
+
+    // No pending subtasks -> complete directly
+    await handleCompleteMainTaskOnly();
+  };
+
+  const handleCompleteMainTaskOnly = async (): Promise<void> => {
+    const prevTaskBucketOverride = taskBucketOverride;
+    setTaskBucketOverride("DONE");
+    try {
+      const res = await updateTaskStatus({ taskId: task.id, bucket: "DONE" });
+      if (res.success) {
+        sileo.success({
+          title: "Tarea completada",
+          description: `"${task.title}" fue marcada como completada.`,
+        });
+        router.refresh();
+      } else {
+        setTaskBucketOverride(prevTaskBucketOverride);
+        sileo.error({
+          title: "Error al completar",
+          description: res.error,
+        });
+      }
+    } catch {
+      setTaskBucketOverride(prevTaskBucketOverride);
+      sileo.error({
+        title: "Error al completar",
+        description: "No se pudo marcar la tarea como completada.",
+      });
+    }
+  };
+
+  const handleCompleteTaskAndSubtasks = async (): Promise<void> => {
+    const pending = subtasks.filter((s) => s.bucket !== "DONE");
+    const prevTaskBucketOverride = taskBucketOverride;
+    const prevSubtaskOverrides = { ...subtaskOverrides };
+
+    // Optimistically mark main task and pending subtasks as DONE
+    setTaskBucketOverride("DONE");
+    setSubtaskOverrides((prev) => {
+      const next = { ...prev };
+      pending.forEach((st) => {
+        next[st.id] = "DONE";
+      });
+      return next;
+    });
+
+    try {
+      const res = await updateTaskStatus({ taskId: task.id, bucket: "DONE" });
+      if (!res.success) {
+        setTaskBucketOverride(prevTaskBucketOverride);
+        setSubtaskOverrides(prevSubtaskOverrides);
+        sileo.error({
+          title: "Error al completar tarea",
+          description: res.error,
+        });
+        return;
+      }
+
+      await Promise.all(
+        pending.map((st) => updateTaskStatus({ taskId: st.id, bucket: "DONE" }))
+      );
+
+      sileo.success({
+        title: "Tarea y subtareas completadas",
+        description: `"${task.title}" y sus ${pending.length} subtareas fueron marcadas como completadas.`,
+      });
+      router.refresh();
+    } catch {
+      setTaskBucketOverride(prevTaskBucketOverride);
+      setSubtaskOverrides(prevSubtaskOverrides);
+      sileo.error({
+        title: "Error al completar subtareas",
+        description: "Ocurrió un error al completar las tareas.",
+      });
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
@@ -136,11 +295,11 @@ export function TaskCard({
   ): Promise<void> => {
     e.stopPropagation();
     const nextStatus = currentStatus === "DONE" ? "TODO" : "DONE";
-    const prevSubtasks = subtasks;
 
-    setSubtasks((prev) =>
-      prev.map((st) => (st.id === subtaskId ? { ...st, bucket: nextStatus } : st))
-    );
+    setSubtaskOverrides((prev) => ({
+      ...prev,
+      [subtaskId]: nextStatus,
+    }));
 
     try {
       const res = await updateTaskStatus({
@@ -149,7 +308,10 @@ export function TaskCard({
       });
 
       if (!res.success) {
-        setSubtasks(prevSubtasks);
+        setSubtaskOverrides((prev) => ({
+          ...prev,
+          [subtaskId]: currentStatus,
+        }));
         sileo.error({
           title: "Error al actualizar subtarea",
           description: res.error,
@@ -158,7 +320,10 @@ export function TaskCard({
       }
       router.refresh();
     } catch {
-      setSubtasks(prevSubtasks);
+      setSubtaskOverrides((prev) => ({
+        ...prev,
+        [subtaskId]: currentStatus,
+      }));
       sileo.error({
         title: "Error al actualizar subtarea",
         description: "Ocurrió un error inesperado.",
@@ -208,8 +373,27 @@ export function TaskCard({
       >
         {/* Header: Title & Actions */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-xs font-semibold text-text-primary leading-snug line-clamp-2">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            {/* Round completion check button on hover or persistent if DONE */}
+            <button
+              type="button"
+              aria-label={isDone ? "Marcar como pendiente" : "Completar tarea"}
+              onClick={handleMainTaskCheckClick}
+              className={cn(
+                "mt-0.5 size-4 rounded-full border transition-all flex items-center justify-center shrink-0 cursor-pointer",
+                isDone
+                  ? "bg-primary border-primary text-primary-foreground shadow-xs opacity-100"
+                  : "border-border/80 hover:border-primary/80 hover:bg-primary/20 opacity-0 group-hover:opacity-100"
+              )}
+            >
+              {isDone && <IconCheck className="size-2.5 stroke-3" />}
+            </button>
+            <span
+              className={cn(
+                "text-xs font-semibold leading-snug line-clamp-2 transition-all flex-1",
+                isDone ? "line-through text-text-muted" : "text-text-primary"
+              )}
+            >
               {task.title}
             </span>
           </div>
@@ -267,72 +451,91 @@ export function TaskCard({
           )}
         </div>
 
-        {/* Subtareas en forma de checklist si está habilitado */}
-        {task.showSubtasksOnCard && subtasks.length > 0 && (
-          <div
-            className="flex flex-col gap-1.5 pt-2 border-t border-border/40"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between text-[10px] text-text-muted font-medium mb-0.5">
-              <span>Subtareas</span>
-              <span className="font-mono">
-                {subtasks.filter((s) => s.bucket === "DONE").length}/{subtasks.length}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              {subtasks.map((st) => {
-                const isCompleted = st.bucket === "DONE";
-                return (
-                  <div
-                    key={st.id}
-                    onClick={(e) => handleToggleSubtask(e, st.id, st.bucket)}
-                    className="flex items-center gap-2 group/st py-1 px-1.5 rounded-md hover:bg-surface-elevated/70 transition-colors cursor-pointer select-none"
-                  >
-                    <button
-                      type="button"
-                      aria-label={isCompleted ? "Marcar como pendiente" : "Marcar como completada"}
-                      className={cn(
-                        "size-3.5 shrink-0 rounded flex items-center justify-center border transition-all cursor-pointer",
-                        isCompleted
-                          ? "bg-primary border-primary text-primary-foreground shadow-xs"
-                          : "border-border hover:border-primary/60 bg-surface"
-                      )}
+        {/* Subtareas: si showSubtasksOnCard es true muestra el checklist interactivo; si es false pero tiene subtareas, muestra barra de progreso */}
+        {subtasks.length > 0 && (
+          task.showSubtasksOnCard ? (
+            /* Modo Checklist interactivo */
+            <div
+              className="flex flex-col gap-1.5 pt-2 border-t border-border/40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between text-[10px] text-text-muted font-medium mb-0.5">
+                <span>Subtareas</span>
+                <span className="font-mono">
+                  {completedCount}/{subtasks.length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {pendingSubtasks.length === 0 ? (
+                  <span className="text-[10px] text-emerald-400 font-medium py-0.5 flex items-center gap-1">
+                    <IconCheck className="size-3" />
+                    Todas las subtareas completadas
+                  </span>
+                ) : (
+                  pendingSubtasks.map((st) => (
+                    <div
+                      key={st.id}
+                      onClick={(e) => handleToggleSubtask(e, st.id, st.bucket)}
+                      className="flex items-center gap-2 group/st py-1 px-1.5 rounded-md hover:bg-surface-elevated/70 transition-colors cursor-pointer select-none"
                     >
-                      {isCompleted && <IconCheck className="size-2.5 stroke-3" />}
-                    </button>
-                    <span
-                      className={cn(
-                        "text-[11px] leading-tight truncate flex-1 transition-all",
-                        isCompleted
-                          ? "line-through text-text-muted"
-                          : "text-text-primary group-hover/st:text-text-primary"
-                      )}
-                    >
-                      {st.title}
-                    </span>
-                    {st.assignee && (
-                      <span className="shrink-0 text-[9px] text-text-muted">
-                        {st.assignee.image ? (
-                          <Image
-                            src={st.assignee.image}
-                            alt={st.assignee.name ?? "Avatar"}
-                            width={14}
-                            height={14}
-                            unoptimized
-                            className="size-3.5 rounded-full object-cover border border-border"
-                          />
-                        ) : (
-                          <span className="flex size-3.5 items-center justify-center rounded-full bg-primary/20 text-[8px] font-bold text-primary">
-                            {(st.assignee.name?.[0] ?? "U").toUpperCase()}
-                          </span>
-                        )}
+                      <button
+                        type="button"
+                        aria-label="Marcar como completada"
+                        className="size-3.5 shrink-0 rounded flex items-center justify-center border border-border hover:border-primary/60 bg-surface transition-all cursor-pointer"
+                      >
+                      </button>
+                      <span className="text-[11px] leading-tight truncate flex-1 text-text-primary group-hover/st:text-text-primary transition-all">
+                        {st.title}
                       </span>
-                    )}
-                  </div>
-                );
-              })}
+                      {st.assignee && (
+                        <span className="shrink-0 text-[9px] text-text-muted">
+                          {st.assignee.image ? (
+                            <Image
+                              src={st.assignee.image}
+                              alt={st.assignee.name ?? "Avatar"}
+                              width={14}
+                              height={14}
+                              unoptimized
+                              className="size-3.5 rounded-full object-cover border border-border"
+                            />
+                          ) : (
+                            <span className="flex size-3.5 items-center justify-center rounded-full bg-primary/20 text-[8px] font-bold text-primary">
+                              {(st.assignee.name?.[0] ?? "U").toUpperCase()}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Modo Barra de progreso cuando el switch NO está activado */
+            <div
+              className="flex flex-col gap-1.5 pt-2 border-t border-border/40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between text-[10px] text-text-muted font-medium">
+                <span className="flex items-center gap-1">
+                  <IconListCheck className="size-3 text-text-muted" />
+                  <span>Subtareas</span>
+                </span>
+                <span className="font-mono">
+                  {completedCount}/{subtasks.length} ({progressPercent}%)
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden border border-border/40">
+                <div
+                  className={cn(
+                    "h-full transition-all duration-300 rounded-full",
+                    progressPercent === 100 ? "bg-emerald-400" : "bg-primary"
+                  )}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )
         )}
 
         {/* Footer: Due date & Assignee */}
@@ -457,6 +660,10 @@ export function TaskCard({
         customPriorities={customPriorities}
         isOpen={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
+        onTaskCreatedOrUpdated={() => {
+          setSubtaskOverrides({});
+          router.refresh();
+        }}
       />
     </>
   );

@@ -37,6 +37,13 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
   - Main task labels rendered on `TaskCard` next to EPIC badge.
   - Subtask labels strictly isolated from `TaskCard`, appearing only in their own view (subtask list and subtask modal).
   - Updated `TaskBoard` priority filter to support multi-label tasks.
+- [x] TASK-12: Subtask completion flow, main task auto-completion, round check with subtask prompt, completed subtask hiding, and progress bar:
+  - Added completion checkbox in `TaskFormDialog` subtasks table.
+  - Implemented auto-completion of parent task when all subtasks become completed (`bucket: "DONE"`).
+  - Added hover round check on `TaskCard` with interactive Sileo action toast (`CompleteTaskConfirmToast`) to prompt completing pending subtasks, direct completion if none, and notifications.
+  - Filtered completed subtasks out of the `TaskCard` checklist so only pending items appear.
+  - Added subtasks progress bar on `TaskCard` when `showSubtasksOnCard` is false.
+  - Fixed subtask sync bug on `TaskCard` using derived `subtaskOverrides` pattern and instant mutation callback notifications.
 
 ## Verification Evidence
 - `bun run lint` (ESLint) completed with 0 errors and 0 warnings.
@@ -56,3 +63,7 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 - `TaskCard` renders all assigned labels of the main task in the badge row (`[P3] [P2] [P1] [EPIC]`).
 - `TaskCard` checklist items display only completion status, subtask title, and assignee avatar; subtask labels never appear on the parent task card.
 - `TaskLabelSelector` enables toggling multiple labels with checkmarks, responsive pills with `x` remove buttons, and inline customize action.
+- Round check button on `TaskCard` hover allows toggling main task completion and displays an interactive Sileo toast asking to complete pending subtasks if any exist.
+- Completed subtasks are hidden from `TaskCard` checklist while total/completed counter remains accurate.
+- When `showSubtasksOnCard` is false, `TaskCard` displays a progress bar of completed subtasks.
+- In `TaskFormDialog`, each subtask has a completion check, and completing the last pending subtask automatically completes the parent task.
