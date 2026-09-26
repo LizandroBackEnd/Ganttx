@@ -22,11 +22,14 @@ import { CompleteTaskConfirmToast } from "./complete-task-confirm-toast";
 import { cn } from "@/lib/utils";
 import { deleteTask, updateTask, updateTaskStatus } from "../api/task-mutations";
 import { sileo } from "sileo";
-import type {
-  TaskDTO,
-  CustomStatusOption,
-  CustomPriorityOption,
-  TaskAssigneeDTO,
+import {
+  isTaskDone,
+  toDoneBucket,
+  toUndoneBucket,
+  type TaskDTO,
+  type CustomStatusOption,
+  type CustomPriorityOption,
+  type TaskAssigneeDTO,
 } from "../types/task.types";
 
 export interface TaskCardProps {
@@ -70,29 +73,34 @@ export function TaskCard({
   }
 
   const currentBucket = taskBucketOverride ?? task.bucket;
-  const isDone = currentBucket === "DONE";
+  const isDone = isTaskDone(currentBucket);
 
   const subtasks = (task.subtasks ?? []).map((st) => ({
     ...st,
     bucket: subtaskOverrides[st.id] ?? st.bucket,
   }));
 
-  const pendingSubtasks = subtasks.filter((st) => st.bucket !== "DONE");
-  const completedCount = subtasks.filter((st) => st.bucket === "DONE").length;
+  const completedCount = subtasks.filter((st) => isTaskDone(st.bucket)).length;
   const progressPercent =
     subtasks.length > 0 ? Math.round((completedCount / subtasks.length) * 100) : 0;
+
+  const defaultReopenBucket =
+    customStatuses && customStatuses.length > 0
+      ? (customStatuses.find((s) => s.id !== "DONE")?.id ?? customStatuses[0].id)
+      : "TODO";
 
   const handleMainTaskCheckClick = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
     if (isDone) {
+      const undoneBucket = toUndoneBucket(currentBucket, defaultReopenBucket);
       const prevTaskBucketOverride = taskBucketOverride;
-      setTaskBucketOverride("TODO");
+      setTaskBucketOverride(undoneBucket);
       try {
-        const res = await updateTaskStatus({ taskId: task.id, bucket: "TODO" });
+        const res = await updateTaskStatus({ taskId: task.id, bucket: undoneBucket });
         if (res.success) {
           sileo.info({
             title: "Tarea reabierta",
-            description: `"${task.title}" marcada como pendiente.`,
+            description: `"${task.title}" marcada como sin completar.`,
           });
           router.refresh();
         } else {
@@ -113,7 +121,7 @@ export function TaskCard({
     }
 
     // Completing task: check if there are pending subtasks
-    const pending = subtasks.filter((s) => s.bucket !== "DONE");
+    const pending = subtasks.filter((s) => !isTaskDone(s.bucket));
     if (pending.length > 0) {
       toastIdRef.current = sileo.action({
         title: "¿Completar subtareas?",
@@ -148,9 +156,10 @@ export function TaskCard({
 
   const handleCompleteMainTaskOnly = async (): Promise<void> => {
     const prevTaskBucketOverride = taskBucketOverride;
-    setTaskBucketOverride("DONE");
+    const doneBucket = toDoneBucket(task.bucket);
+    setTaskBucketOverride(doneBucket);
     try {
-      const res = await updateTaskStatus({ taskId: task.id, bucket: "DONE" });
+      const res = await updateTaskStatus({ taskId: task.id, bucket: doneBucket });
       if (res.success) {
         sileo.success({
           title: "Tarea completada",
@@ -174,22 +183,23 @@ export function TaskCard({
   };
 
   const handleCompleteTaskAndSubtasks = async (): Promise<void> => {
-    const pending = subtasks.filter((s) => s.bucket !== "DONE");
+    const pending = subtasks.filter((s) => !isTaskDone(s.bucket));
     const prevTaskBucketOverride = taskBucketOverride;
     const prevSubtaskOverrides = { ...subtaskOverrides };
 
+    const doneBucket = toDoneBucket(task.bucket);
     // Optimistically mark main task and pending subtasks as DONE
-    setTaskBucketOverride("DONE");
+    setTaskBucketOverride(doneBucket);
     setSubtaskOverrides((prev) => {
       const next = { ...prev };
       pending.forEach((st) => {
-        next[st.id] = "DONE";
+        next[st.id] = toDoneBucket(st.bucket);
       });
       return next;
     });
 
     try {
-      const res = await updateTaskStatus({ taskId: task.id, bucket: "DONE" });
+      const res = await updateTaskStatus({ taskId: task.id, bucket: doneBucket });
       if (!res.success) {
         setTaskBucketOverride(prevTaskBucketOverride);
         setSubtaskOverrides(prevSubtaskOverrides);
@@ -201,7 +211,9 @@ export function TaskCard({
       }
 
       await Promise.all(
-        pending.map((st) => updateTaskStatus({ taskId: st.id, bucket: "DONE" }))
+        pending.map((st) =>
+          updateTaskStatus({ taskId: st.id, bucket: toDoneBucket(st.bucket) })
+        )
       );
 
       sileo.success({
@@ -294,7 +306,10 @@ export function TaskCard({
     currentStatus: string
   ): Promise<void> => {
     e.stopPropagation();
-    const nextStatus = currentStatus === "DONE" ? "TODO" : "DONE";
+    const isCurrentlyDone = isTaskDone(currentStatus);
+    const nextStatus = isCurrentlyDone
+      ? toUndoneBucket(currentStatus, "TODO")
+      : toDoneBucket(currentStatus);
 
     setSubtaskOverrides((prev) => ({
       ...prev,
@@ -318,6 +333,26 @@ export function TaskCard({
         });
         return;
       }
+
+      // Check if all subtasks are now DONE -> auto-complete main task
+      const updatedSubtasks = subtasks.map((s) =>
+        s.id === subtaskId ? { ...s, bucket: nextStatus } : s
+      );
+      const allDone =
+        updatedSubtasks.length > 0 &&
+        updatedSubtasks.every((s) => isTaskDone(s.bucket));
+
+      if (allDone && !isDone) {
+        const doneBucket = toDoneBucket(task.bucket);
+        setTaskBucketOverride(doneBucket);
+        await updateTaskStatus({ taskId: task.id, bucket: doneBucket });
+        sileo.success({
+          title: "Tarea completada",
+          description:
+            "Todas las subtareas fueron completadas, por lo que la tarea principal se completó automáticamente.",
+        });
+      }
+
       router.refresh();
     } catch {
       setSubtaskOverrides((prev) => ({
@@ -356,6 +391,78 @@ export function TaskCard({
     currentAssignee?.email?.[0] ??
     "U"
   ).toUpperCase();
+
+  if (isDone) {
+    return (
+      <>
+        <div
+          draggable={canEdit}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onClick={() => setIsEditDialogOpen(true)}
+          className={cn(
+            "group relative flex items-center justify-between gap-2 rounded-xl p-2.5 transition-all select-none border cursor-grab active:cursor-grabbing",
+            "bg-surface/50 hover:bg-surface/80 border-border/60 hover:border-primary/40 shadow-2xs hover:shadow-xs opacity-80 hover:opacity-100",
+            isDragging && "opacity-40 scale-[0.98] ring-2 ring-primary border-primary",
+            task.isEpic && "border-l-4 border-l-purple-500/50"
+          )}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              type="button"
+              aria-label="Marcar tarea como sin completar"
+              onClick={handleMainTaskCheckClick}
+              className="size-4 rounded-full border transition-all flex items-center justify-center shrink-0 cursor-pointer bg-primary border-primary text-primary-foreground shadow-xs"
+            >
+              <IconCheck className="size-2.5 stroke-3" />
+            </button>
+            <span className="text-xs font-semibold leading-snug truncate transition-all flex-1 line-through text-text-muted">
+              {task.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditDialogOpen(true);
+              }}
+              className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors cursor-pointer"
+              aria-label="Editar tarea"
+            >
+              <IconPencil className="size-3.5" />
+            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="p-1 rounded-md text-text-muted hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                aria-label="Eliminar tarea"
+              >
+                <IconTrash className="size-3.5" />
+              </button>
+            )}
+            <IconGripVertical className="size-3.5 text-text-muted" />
+          </div>
+        </div>
+
+        {isEditDialogOpen && (
+          <TaskFormDialog
+            projectId={projectId}
+            taskToEdit={task}
+            members={members}
+            availableEpics={availableEpics}
+            customStatuses={customStatuses}
+            customPriorities={customPriorities}
+            isOpen={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -466,13 +573,9 @@ export function TaskCard({
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                {pendingSubtasks.length === 0 ? (
-                  <span className="text-[10px] text-emerald-400 font-medium py-0.5 flex items-center gap-1">
-                    <IconCheck className="size-3" />
-                    Todas las subtareas completadas
-                  </span>
-                ) : (
-                  pendingSubtasks.map((st) => (
+                {subtasks.map((st) => {
+                  const isSubtaskDone = isTaskDone(st.bucket);
+                  return (
                     <div
                       key={st.id}
                       onClick={(e) => handleToggleSubtask(e, st.id, st.bucket)}
@@ -480,11 +583,28 @@ export function TaskCard({
                     >
                       <button
                         type="button"
-                        aria-label="Marcar como completada"
-                        className="size-3.5 shrink-0 rounded flex items-center justify-center border border-border hover:border-primary/60 bg-surface transition-all cursor-pointer"
+                        aria-label={
+                          isSubtaskDone
+                            ? "Marcar subtarea como sin completar"
+                            : "Marcar subtarea como completada"
+                        }
+                        className={cn(
+                          "size-3.5 shrink-0 rounded-full flex items-center justify-center border transition-all cursor-pointer",
+                          isSubtaskDone
+                            ? "bg-primary border-primary text-primary-foreground shadow-2xs"
+                            : "border-border hover:border-primary/60 bg-surface"
+                        )}
                       >
+                        {isSubtaskDone && <IconCheck className="size-2.5 stroke-3" />}
                       </button>
-                      <span className="text-[11px] leading-tight truncate flex-1 text-text-primary group-hover/st:text-text-primary transition-all">
+                      <span
+                        className={cn(
+                          "text-[11px] leading-tight truncate flex-1 transition-all",
+                          isSubtaskDone
+                            ? "line-through text-text-muted"
+                            : "text-text-primary group-hover/st:text-text-primary"
+                        )}
+                      >
                         {st.title}
                       </span>
                       {st.assignee && (
@@ -506,8 +626,8 @@ export function TaskCard({
                         </span>
                       )}
                     </div>
-                  ))
-                )}
+                  );
+                })}
               </div>
             </div>
           ) : (

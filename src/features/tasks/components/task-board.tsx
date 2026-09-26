@@ -40,6 +40,9 @@ import { sileo } from "sileo";
 import { updateTaskStatus, updateProjectCustomOptions } from "../api/task-mutations";
 import {
   getProjectBuckets,
+  getTaskBucketId,
+  isTaskDone,
+  toDoneBucket,
   type TaskDTO,
   type BucketOption,
   type CustomStatusOption,
@@ -132,12 +135,19 @@ export function TaskBoard({
   // Handle Drag & Drop Task between Buckets
   const handleTaskDrop = (taskId: string, targetBucketId: string): void => {
     const currentTask = optimisticTasks.find((t) => t.id === taskId);
-    if (!currentTask || currentTask.bucket === targetBucketId) return;
+    if (!currentTask || getTaskBucketId(currentTask.bucket) === targetBucketId) return;
+
+    // Preserva el estado completado si ya estaba completada, pero en el nuevo bucket
+    const isCompleted = isTaskDone(currentTask.bucket);
+    const newBucket =
+      isCompleted && targetBucketId !== "DONE"
+        ? toDoneBucket(targetBucketId)
+        : targetBucketId;
 
     startTransition(async () => {
-      setOptimisticTaskStatus({ taskId, targetBucketId });
+      setOptimisticTaskStatus({ taskId, targetBucketId: newBucket });
       try {
-        const result = await updateTaskStatus({ taskId, bucket: targetBucketId });
+        const result = await updateTaskStatus({ taskId, bucket: newBucket });
         if (result.success) {
           router.refresh();
         } else {
@@ -298,7 +308,9 @@ export function TaskBoard({
       return;
     }
 
-    const tasksInBucket = optimisticTasks.filter((t) => t.bucket === bucketId);
+    const tasksInBucket = optimisticTasks.filter(
+      (t) => getTaskBucketId(t.bucket) === bucketId
+    );
     if (tasksInBucket.length > 0) {
       sileo.warning({
         title: "Bucket con tareas",
@@ -556,7 +568,7 @@ export function TaskBoard({
         <div className="flex-1 min-h-0 flex items-stretch gap-4 overflow-x-auto pb-3 pt-1 select-none">
           {buckets.map((bucket) => {
             const bucketTasks = filteredTasks.filter(
-              (task) => task.bucket === bucket.id
+              (task) => getTaskBucketId(task.bucket) === bucket.id
             );
             return (
               <TaskBucketColumn

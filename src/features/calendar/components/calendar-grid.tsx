@@ -2,7 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { TaskFormDialog, type ProjectMemberOption } from "@/features/tasks";
+import { IconCheck } from "@tabler/icons-react";
+import {
+  TaskFormDialog,
+  getTaskBucketId,
+  isTaskDone,
+  type ProjectMemberOption,
+} from "@/features/tasks";
 import type {
   TaskDTO,
   TaskParentDTO,
@@ -198,14 +204,26 @@ export function CalendarGrid({
                 className="flex items-center justify-between rounded-lg border border-border/80 bg-surface-elevated/40 p-3 text-left hover:border-primary/40 hover:bg-surface-elevated transition-colors"
               >
                 <div>
-                  <h5 className="text-sm font-medium text-text-primary">{t.title}</h5>
+                  <div className="flex items-center gap-1.5">
+                    {isTaskDone(t.bucket) && (
+                      <IconCheck className="size-3.5 text-emerald-400 stroke-3 shrink-0" />
+                    )}
+                    <h5
+                      className={cn(
+                        "text-sm font-medium",
+                        isTaskDone(t.bucket) ? "line-through text-text-muted" : "text-text-primary"
+                      )}
+                    >
+                      {t.title}
+                    </h5>
+                  </div>
                   {t.description && (
                     <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{t.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="rounded bg-surface px-2 py-0.5 font-mono text-[10px] text-text-secondary">
-                    {t.bucket}
+                    {getTaskBucketId(t.bucket)}
                   </span>
                 </div>
               </button>
@@ -277,8 +295,15 @@ export function CalendarGrid({
                   onClick={() => setSelectedTask(task)}
                   className={`rounded-md border p-2 text-left text-xs transition-all ${getTaskChipStyle(task.label)}`}
                 >
-                  <p className="font-medium truncate text-text-primary">{task.title}</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">{task.bucket}</p>
+                  <p
+                    className={cn(
+                      "font-medium truncate",
+                      isTaskDone(task.bucket) ? "line-through text-text-muted" : "text-text-primary"
+                    )}
+                  >
+                    {task.title}
+                  </p>
+                  <p className="text-[10px] text-text-muted mt-0.5">{getTaskBucketId(task.bucket)}</p>
                 </button>
               ))}
             </div>

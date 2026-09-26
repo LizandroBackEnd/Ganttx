@@ -8,7 +8,14 @@ import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from ".
 import { updateTaskStatus, deleteTask } from "../api/task-mutations";
 import { IconCheck, IconPencil, IconTrash, IconCrown } from "@tabler/icons-react";
 import { sileo } from "sileo";
-import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
+import {
+  isTaskDone,
+  toDoneBucket,
+  toUndoneBucket,
+  type TaskDTO,
+  type CustomStatusOption,
+  type CustomPriorityOption,
+} from "../types/task.types";
 
 export interface TaskRowProps {
   readonly task: TaskDTO;
@@ -30,6 +37,7 @@ export function TaskRow({
   const router = useRouter();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const isDone = isTaskDone(task.bucket);
 
   const handleStatusChange = async (newStatus: string): Promise<void> => {
     try {
@@ -90,15 +98,15 @@ export function TaskRow({
           {/* Quick status toggle */}
           <button
             type="button"
-            onClick={() => handleStatusChange(task.bucket === "DONE" ? "TODO" : "DONE")}
-            aria-label={task.bucket === "DONE" ? "Marcar como incompleta" : "Marcar como completada"}
-            className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer ${
-              task.bucket === "DONE"
+            onClick={() => handleStatusChange(isDone ? toUndoneBucket(task.bucket) : toDoneBucket(task.bucket))}
+            aria-label={isDone ? "Marcar como sin completar" : "Marcar como completada"}
+            className={`flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors cursor-pointer ${
+              isDone
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
                 : "border-border hover:border-primary"
             }`}
           >
-            {task.bucket === "DONE" && (
+            {isDone && (
               <IconCheck className="size-3.5 stroke-3" />
             )}
           </button>
@@ -119,7 +127,7 @@ export function TaskRow({
               )}
               <span
                 className={`text-sm font-medium text-text-primary ${
-                  task.bucket === "DONE" ? "line-through text-text-muted" : ""
+                  isDone ? "line-through text-text-muted" : ""
                 }`}
               >
                 {task.title}

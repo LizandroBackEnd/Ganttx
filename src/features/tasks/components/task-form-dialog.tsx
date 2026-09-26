@@ -43,12 +43,15 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { sileo } from "sileo";
-import type {
-  TaskDTO,
-  SubtaskDTO,
-  CustomStatusOption,
-  CustomPriorityOption,
-  UpdateTaskInput,
+import {
+  isTaskDone,
+  toDoneBucket,
+  toUndoneBucket,
+  type TaskDTO,
+  type SubtaskDTO,
+  type CustomStatusOption,
+  type CustomPriorityOption,
+  type UpdateTaskInput,
 } from "../types/task.types";
 
 export interface ProjectMemberOption {
@@ -351,7 +354,10 @@ function TaskFormContent({
     subtaskId: string,
     currentStatus: string
   ): Promise<void> => {
-    const nextStatus = currentStatus === "DONE" ? "TODO" : "DONE";
+    const isCurrentlyDone = isTaskDone(currentStatus);
+    const nextStatus = isCurrentlyDone
+      ? toUndoneBucket(currentStatus, "TODO")
+      : toDoneBucket(currentStatus);
     const updated = subtasks.map((s) =>
       s.id === subtaskId ? { ...s, bucket: nextStatus } : s
     );
@@ -374,16 +380,17 @@ function TaskFormContent({
 
       // Si todas las subtareas están completadas en automático la tarea principal también se debe completar
       const allCompleted =
-        updated.length > 0 && updated.every((s) => s.bucket === "DONE");
+        updated.length > 0 && updated.every((s) => isTaskDone(s.bucket));
 
-      if (allCompleted && currentTask?.id && bucket !== "DONE") {
+      if (allCompleted && currentTask?.id && !isTaskDone(bucket)) {
+        const doneBucket = toDoneBucket(currentTask.bucket ?? bucket);
         await updateTaskStatus({
           taskId: currentTask.id,
-          bucket: "DONE",
+          bucket: doneBucket,
         });
         const updatedTaskDto = {
           ...(currentTask ?? initialTask!),
-          bucket: "DONE",
+          bucket: doneBucket,
           subtasks: updated,
           subtasksCount: updated.length,
         };
@@ -890,25 +897,25 @@ function TaskFormContent({
                     <div className="col-span-5 sm:col-span-5 flex items-center gap-2.5 truncate pr-2">
                       <button
                         type="button"
-                        aria-label={st.bucket === "DONE" ? "Marcar como pendiente" : "Marcar como completada"}
+                        aria-label={isTaskDone(st.bucket) ? "Marcar como pendiente" : "Marcar como completada"}
                         onClick={(e) => {
                           e.stopPropagation();
                           void handleToggleSubtaskCompletion(st.id, st.bucket);
                         }}
                         className={cn(
-                          "size-4 shrink-0 rounded flex items-center justify-center border transition-all cursor-pointer",
-                          st.bucket === "DONE"
+                          "size-4 shrink-0 rounded-full flex items-center justify-center border transition-all cursor-pointer",
+                          isTaskDone(st.bucket)
                             ? "bg-primary border-primary text-primary-foreground shadow-xs"
                             : "border-border hover:border-primary/60 bg-surface"
                         )}
                       >
-                        {st.bucket === "DONE" && <IconCheck className="size-2.5 stroke-3" />}
+                        {isTaskDone(st.bucket) && <IconCheck className="size-2.5 stroke-3" />}
                       </button>
                       <span
                         onClick={() => void handleOpenSubtaskModal(st.id)}
                         className={cn(
                           "truncate hover:text-primary transition-colors font-medium cursor-pointer flex-1",
-                          st.bucket === "DONE" && "line-through text-text-muted"
+                          isTaskDone(st.bucket) && "line-through text-text-muted"
                         )}
                       >
                         {st.title}

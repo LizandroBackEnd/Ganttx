@@ -6,11 +6,13 @@ import { TaskFormDialog, type ProjectMemberOption } from "./task-form-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { IconInbox, IconPlus, IconSearch } from "@tabler/icons-react";
-import type {
-  TaskDTO,
-  TaskParentDTO,
-  CustomStatusOption,
-  CustomPriorityOption,
+import {
+  getTaskBucketId,
+  isTaskDone,
+  type TaskDTO,
+  type TaskParentDTO,
+  type CustomStatusOption,
+  type CustomPriorityOption,
 } from "../types/task.types";
 
 export interface TaskTableProps {
@@ -60,7 +62,11 @@ export function TaskTable({
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      const matchesTab = activeTab === "ALL" || task.bucket === activeTab;
+      const matchesTab =
+        activeTab === "ALL" ||
+        (activeTab === "DONE"
+          ? isTaskDone(task.bucket)
+          : getTaskBucketId(task.bucket) === activeTab);
       const matchesSearch =
         !searchQuery.trim() ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -79,7 +85,11 @@ export function TaskTable({
             const count =
               tab.id === "ALL"
                 ? tasks.length
-                : tasks.filter((t) => t.bucket === tab.id).length;
+                : tasks.filter((t) =>
+                    tab.id === "DONE"
+                      ? isTaskDone(t.bucket)
+                      : getTaskBucketId(t.bucket) === tab.id
+                  ).length;
             const isActive = activeTab === tab.id;
             return (
               <button

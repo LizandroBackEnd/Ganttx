@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { IconCrown } from "@tabler/icons-react";
-import type { TaskDTO } from "@/features/tasks";
+import { cn } from "@/lib/utils";
+import { getTaskBucketId, isTaskDone, type TaskDTO } from "@/features/tasks";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
 export interface GanttBarProps {
@@ -166,10 +167,12 @@ export function GanttBar({
           {task.isEpic && (
             <IconCrown className="size-3 text-purple-300 shrink-0" />
           )}
-          <span className="truncate">{task.title}</span>
+          <span className={cn("truncate", isTaskDone(task.bucket) && "line-through opacity-70")}>
+            {task.title}
+          </span>
         </div>
         <span className="font-mono text-[10px] text-text-muted ml-1 shrink-0">
-          {task.bucket}
+          {getTaskBucketId(task.bucket)}
         </span>
       </div>
 

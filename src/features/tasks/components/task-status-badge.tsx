@@ -1,5 +1,6 @@
 import { Badge } from "@/shared/components/ui/badge";
 import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/constants";
+import { isTaskDone, getTaskBucketId } from "../types/task.types";
 import { cn } from "@/lib/utils";
 
 export interface TaskStatusBadgeProps {
@@ -23,9 +24,13 @@ export function TaskStatusBadge({
   bucket,
   className,
 }: TaskStatusBadgeProps): React.JSX.Element {
-  const value = bucket ?? status ?? "TODO";
-  const label = TASK_STATUS_LABELS[value as TaskStatus] ?? value;
-  const style = statusStyles[value] ?? "bg-primary/10 text-primary border-primary/30";
+  const rawValue = bucket ?? status ?? "TODO";
+  const bucketId = getTaskBucketId(rawValue);
+  const isDone = isTaskDone(rawValue);
+  const label = TASK_STATUS_LABELS[bucketId as TaskStatus] ?? bucketId;
+  const style = isDone
+    ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/10"
+    : (statusStyles[bucketId] ?? "bg-primary/10 text-primary border-primary/30");
 
   return (
     <Badge

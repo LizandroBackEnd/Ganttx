@@ -212,3 +212,31 @@ export function getProjectBuckets(
   }
   return [...DEFAULT_BUCKETS];
 }
+
+export function isTaskDone(bucket: string): boolean {
+  return bucket === "DONE" || bucket.startsWith("DONE__");
+}
+
+export function getTaskBucketId(bucket: string): string {
+  if (bucket.startsWith("DONE__")) {
+    return bucket.slice(6);
+  }
+  return bucket;
+}
+
+export function toDoneBucket(currentBucket: string): string {
+  if (isTaskDone(currentBucket)) {
+    return currentBucket;
+  }
+  return `DONE__${currentBucket}`;
+}
+
+export function toUndoneBucket(currentBucket: string, fallback = "TODO"): string {
+  if (currentBucket.startsWith("DONE__")) {
+    return currentBucket.slice(6);
+  }
+  if (currentBucket === "DONE") {
+    return fallback;
+  }
+  return currentBucket;
+}
