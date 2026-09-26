@@ -10,7 +10,6 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/shared/components/ui/dialog";
-import { Input } from "@/shared/components/ui/input";
 import { DatePicker } from "@/shared/components/ui/date-picker";
 import {
   Select,
@@ -25,6 +24,7 @@ import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-di
 import { TaskCommentsPanel } from "./task-comments-panel";
 import { TaskPriorityBadge, parseTaskLabels } from "./task-priority-badge";
 import { TaskLabelSelector } from "./task-label-selector";
+import { TaskPredecessorsSelector } from "./task-predecessors-selector";
 import {
   createTask,
   updateTask,
@@ -86,6 +86,7 @@ export interface TaskFormDialogProps {
   readonly parentTitle?: string;
   readonly parentStartDate?: string;
   readonly parentDueDate?: string;
+  readonly availableTasks?: readonly TaskDTO[];
 }
 
 function formatLocalDate(d: Date): string {
@@ -135,6 +136,7 @@ interface TaskFormContentProps {
   readonly parentTitle?: string;
   readonly parentStartDate?: string;
   readonly parentDueDate?: string;
+  readonly availableTasks?: readonly TaskDTO[];
 }
 
 function TaskFormContent({
@@ -151,6 +153,7 @@ function TaskFormContent({
   parentTitle,
   parentStartDate,
   parentDueDate,
+  availableTasks,
 }: TaskFormContentProps): React.JSX.Element {
   const router = useRouter();
   const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
@@ -870,24 +873,23 @@ function TaskFormContent({
 
         {/* Fila 3: Predecesoras */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
-            Predecesoras
+          <label className="text-xs font-semibold text-text-primary flex items-center justify-between">
+            <span>Predecesoras</span>
+            <span className="text-[10px] font-normal text-text-muted">
+              Tareas que deben completarse antes
+            </span>
           </label>
-          <Input
-            id="task-predecessors"
-            type="text"
-            placeholder="ej. Tarea 1..."
+          <TaskPredecessorsSelector
+            projectId={projectId}
+            currentTaskId={currentTask?.id || initialTask?.id}
             value={predecessors}
-            onChange={(e) => {
-              const next = e.target.value;
-              setPredecessors(next);
-              queueDebouncedSave({ predecessors: next.trim() || null });
+            onChange={(next) => {
+              setPredecessors(next ?? "");
+              triggerImmediateSave({ predecessors: next });
             }}
-            onBlur={() => {
-              triggerImmediateSave({ predecessors: predecessors.trim() || null });
-            }}
-            maxLength={500}
-            className="border-border bg-background text-xs rounded-xl h-9"
+            availableTasks={availableTasks}
+            customStatuses={customStatuses}
+            customPriorities={priorities}
           />
         </div>
 
@@ -1239,6 +1241,7 @@ export function TaskFormDialog({
   parentTitle: parentTitleProp,
   parentStartDate: parentStartDateProp,
   parentDueDate: parentDueDateProp,
+  availableTasks,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
   const isSubtask = Boolean(isSubtaskProp || initialTask?.parentId);
@@ -1290,6 +1293,7 @@ export function TaskFormDialog({
               parentTitle={parentTitle}
               parentStartDate={parentStartDate}
               parentDueDate={parentDueDate}
+              availableTasks={availableTasks}
             />
           )}
         </DialogContent>

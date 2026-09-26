@@ -20,6 +20,7 @@ import type {
 export interface TaskBucketColumnProps {
   readonly bucket: BucketOption;
   readonly tasks: readonly TaskDTO[];
+  readonly allTasks?: readonly TaskDTO[];
   readonly projectId: string;
   readonly members?: readonly ProjectMemberOption[];
   readonly availableEpics?: readonly TaskEpicOption[];
@@ -50,6 +51,7 @@ function formatLocalDate(d: Date): string {
 export function TaskBucketColumn({
   bucket,
   tasks,
+  allTasks,
   projectId,
   members = [],
   availableEpics = [],
@@ -325,6 +327,7 @@ export function TaskBucketColumn({
                   projectId={projectId}
                   members={members}
                   availableEpics={availableEpics}
+                  availableTasks={allTasks ?? tasks}
                   customStatuses={customStatuses}
                   customPriorities={customPriorities}
                   canEdit={canEdit}
@@ -373,6 +376,7 @@ export function TaskBucketColumn({
           taskToEdit={createdTaskForModal}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={allTasks ?? tasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           isOpen={isDetailModalOpen}

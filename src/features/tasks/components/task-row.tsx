@@ -21,6 +21,7 @@ export interface TaskRowProps {
   readonly task: TaskDTO;
   readonly members?: readonly ProjectMemberOption[];
   readonly availableEpics?: readonly TaskEpicOption[];
+  readonly availableTasks?: readonly TaskDTO[];
   readonly customStatuses?: readonly CustomStatusOption[] | null;
   readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly canEdit?: boolean;
@@ -30,6 +31,7 @@ export function TaskRow({
   task,
   members = [],
   availableEpics = [],
+  availableTasks,
   customStatuses,
   customPriorities,
   canEdit = true,
@@ -202,6 +204,7 @@ export function TaskRow({
           projectId={task.projectId}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={availableTasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           taskToEdit={task}

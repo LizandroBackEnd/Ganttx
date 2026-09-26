@@ -28,6 +28,17 @@ export interface TaskParentDTO {
   readonly dueDate?: string;
 }
 
+export interface TaskPredecessorCandidateDTO {
+  readonly id: string;
+  readonly title: string;
+  readonly bucket: string;
+  readonly label: string;
+  readonly isEpic: boolean;
+  readonly startDate: string;
+  readonly dueDate: string;
+  readonly parentId: string | null;
+}
+
 export interface TaskDTO {
   readonly id: string;
   readonly title: string; // Nombre de la tarea

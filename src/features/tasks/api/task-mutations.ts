@@ -23,6 +23,7 @@ import {
   type CustomStatusOption,
   type CustomPriorityOption,
   type SubtaskDTO,
+  type TaskPredecessorCandidateDTO,
 } from "../types/task.types";
 
 function parseDateStringToUtcDate(dateString: string): Date {
@@ -950,6 +951,52 @@ export async function createTaskComment(
       success: false,
       error: err instanceof Error ? err.message : "Error al publicar el comentario",
     };
+  }
+}
+
+export async function getProjectTasksForPredecessors(
+  projectId: string
+): Promise<TaskActionResult<TaskPredecessorCandidateDTO[]>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { projectId },
+      select: {
+        id: true,
+        title: true,
+        bucket: true,
+        label: true,
+        isEpic: true,
+        startDate: true,
+        dueDate: true,
+        parentId: true,
+      },
+      orderBy: [
+        { isEpic: "desc" },
+        { startDate: "asc" },
+        { createdAt: "asc" },
+      ],
+    });
+
+    return {
+      success: true,
+      data: tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        bucket: t.bucket,
+        label: t.label,
+        isEpic: t.isEpic,
+        startDate: formatLocalDateToIso(t.startDate),
+        dueDate: formatLocalDateToIso(t.dueDate),
+        parentId: t.parentId,
+      })),
+    };
+  } catch {
+    return { success: false, error: "Error al obtener tareas predecesoras" };
   }
 }
 

@@ -240,6 +240,7 @@ export function CalendarGrid({
             projectId={projectId}
             members={members}
             availableEpics={availableEpics}
+            availableTasks={tasks}
             customStatuses={customStatuses}
             customPriorities={customPriorities}
             taskToEdit={selectedTask}
@@ -252,6 +253,7 @@ export function CalendarGrid({
             projectId={projectId}
             members={members}
             availableEpics={availableEpics}
+            availableTasks={tasks}
             customStatuses={customStatuses}
             customPriorities={customPriorities}
             isOpenControlled={Boolean(createDate)}
@@ -323,6 +325,7 @@ export function CalendarGrid({
             projectId={projectId}
             members={members}
             availableEpics={availableEpics}
+            availableTasks={tasks}
             customStatuses={customStatuses}
             customPriorities={customPriorities}
             taskToEdit={selectedTask}
@@ -335,6 +338,7 @@ export function CalendarGrid({
             projectId={projectId}
             members={members}
             availableEpics={availableEpics}
+            availableTasks={tasks}
             customStatuses={customStatuses}
             customPriorities={customPriorities}
             isOpenControlled={Boolean(createDate)}
@@ -478,6 +482,7 @@ export function CalendarGrid({
           projectId={projectId}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={tasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           taskToEdit={selectedTask}
@@ -490,6 +495,7 @@ export function CalendarGrid({
           projectId={projectId}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={tasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           isOpenControlled={Boolean(createDate)}

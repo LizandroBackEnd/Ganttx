@@ -128,6 +128,7 @@ export function ProjectWorkspace({
               projectId={project.id}
               members={members}
               availableEpics={availableEpics}
+              availableTasks={tasks}
               customStatuses={project.customStatuses}
               customPriorities={project.customPriorities}
               trigger={

@@ -117,6 +117,7 @@ export function GanttChart({
             projectId={projectId}
             members={members}
             availableEpics={availableEpics}
+            availableTasks={tasks}
             customStatuses={customStatuses}
             customPriorities={customPriorities}
             trigger={
@@ -229,6 +230,7 @@ export function GanttChart({
           projectId={projectId}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={tasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           taskToEdit={selectedTask}

@@ -137,6 +137,7 @@ export function TaskTable({
               projectId={projectId}
               members={members}
               availableEpics={availableEpics}
+              availableTasks={tasks}
               customStatuses={customStatuses}
               customPriorities={customPriorities}
               trigger={
@@ -159,6 +160,7 @@ export function TaskTable({
               task={task}
               members={members}
               availableEpics={availableEpics}
+              availableTasks={tasks}
               customStatuses={customStatuses}
               customPriorities={customPriorities}
               canEdit={canEdit}
@@ -181,6 +183,7 @@ export function TaskTable({
                   projectId={projectId}
                   members={members}
                   availableEpics={availableEpics}
+                  availableTasks={tasks}
                   customStatuses={customStatuses}
                   customPriorities={customPriorities}
                   trigger={

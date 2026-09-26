@@ -585,6 +585,7 @@ export function TaskBoard({
                 customStatuses={customStatuses}
                 customPriorities={customPriorities}
                 canEdit={canEdit}
+                allTasks={tasks}
                 onTaskDrop={handleTaskDrop}
                 onBucketReorder={handleBucketReorder}
                 onUpdateBucket={handleUpdateBucket}
@@ -618,6 +619,7 @@ export function TaskBoard({
           projectId={projectId}
           members={members}
           availableEpics={availableEpics}
+          availableTasks={tasks}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
           isOpen={isNewTaskOpen}

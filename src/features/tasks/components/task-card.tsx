@@ -37,6 +37,7 @@ export interface TaskCardProps {
   readonly projectId: string;
   readonly members?: readonly ProjectMemberOption[];
   readonly availableEpics?: readonly TaskEpicOption[];
+  readonly availableTasks?: readonly TaskDTO[];
   readonly customStatuses?: readonly CustomStatusOption[] | null;
   readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly canEdit?: boolean;
@@ -47,6 +48,7 @@ export function TaskCard({
   projectId,
   members = [],
   availableEpics = [],
+  availableTasks,
   customStatuses,
   customPriorities,
   canEdit = true,
@@ -462,6 +464,7 @@ export function TaskCard({
             parentTitle={task.parent?.title}
             parentStartDate={task.parent?.startDate}
             parentDueDate={task.parent?.dueDate}
+            availableTasks={availableTasks}
           />
         )}
       </>
@@ -788,6 +791,7 @@ export function TaskCard({
         parentTitle={task.parent?.title}
         parentStartDate={task.parent?.startDate}
         parentDueDate={task.parent?.dueDate}
+        availableTasks={availableTasks}
         onTaskCreatedOrUpdated={() => {
           setSubtaskOverrides({});
           router.refresh();
