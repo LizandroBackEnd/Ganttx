@@ -29,6 +29,7 @@ import {
   getSubtasks,
   createSubtask,
   deleteSubtask,
+  getTaskDetails,
 } from "../api/task-mutations";
 import {
   IconSettings,
@@ -36,6 +37,7 @@ import {
   IconCheck,
   IconLoader2,
   IconX,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { sileo } from "sileo";
 import type {
@@ -73,6 +75,7 @@ export interface TaskFormDialogProps {
   readonly isOpen?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
+  readonly isSubtask?: boolean;
 }
 
 function formatLocalDate(d: Date): string {
@@ -114,8 +117,11 @@ interface TaskFormContentProps {
   readonly members: readonly ProjectMemberOption[];
   readonly availableEpics: readonly TaskEpicOption[];
   readonly priorities: readonly CustomPriorityOption[];
+  readonly customStatuses?: readonly CustomStatusOption[] | null;
+  readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly onOpenConfig: () => void;
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
+  readonly isSubtask?: boolean;
 }
 
 function TaskFormContent({
@@ -125,11 +131,19 @@ function TaskFormContent({
   members,
   availableEpics,
   priorities,
+  customStatuses,
+  customPriorities,
   onOpenConfig,
   onTaskCreatedOrUpdated,
+  isSubtask: isSubtaskProp,
 }: TaskFormContentProps): React.JSX.Element {
   const router = useRouter();
   const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
+
+  const isSubtask = Boolean(
+    isSubtaskProp || initialTask?.parentId || currentTask?.parentId
+  );
+  const isEpicDisabled = isSubtask;
 
   // Form State initialized directly from initialTask
   const [title, setTitle] = useState<string>(initialTask?.title ?? "");
@@ -137,7 +151,7 @@ function TaskFormContent({
   const [startDate, setStartDate] = useState<string>(initialTask?.startDate ?? getTodayString());
   const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? getOneWeekLaterString());
   const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
-  const [isEpic, setIsEpic] = useState<boolean>(initialTask?.isEpic ?? false);
+  const [isEpic, setIsEpic] = useState<boolean>(isEpicDisabled ? false : (initialTask?.isEpic ?? false));
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
   const bucket = initialTask?.bucket ?? defaultStatus ?? "TODO";
   const [label, setLabel] = useState<string>(initialTask?.label ?? "MEDIUM");
@@ -159,6 +173,10 @@ function TaskFormContent({
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>("");
   const [isSavingSubtask, setIsSavingSubtask] = useState<boolean>(false);
 
+  // Subtask modal state
+  const [subtaskModalTask, setSubtaskModalTask] = useState<TaskDTO | null>(null);
+  const [isLoadingSubtaskModal, setIsLoadingSubtaskModal] = useState<boolean>(false);
+
   // Load subtasks when task is present
   useEffect(() => {
     if (!currentTask?.id) return;
@@ -172,6 +190,71 @@ function TaskFormContent({
       isCancelled = true;
     };
   }, [currentTask?.id]);
+
+  const handleOpenSubtaskModal = async (subtaskId: string): Promise<void> => {
+    setIsLoadingSubtaskModal(true);
+    try {
+      const res = await getTaskDetails(subtaskId);
+      if (res.success && res.data) {
+        setSubtaskModalTask(res.data);
+      } else {
+        sileo.error({
+          title: "Error al cargar la subtarea",
+          description: !res.success ? res.error : "No se pudo encontrar la subtarea",
+        });
+      }
+    } catch {
+      sileo.error({
+        title: "Error inesperado",
+        description: "No se pudo abrir el detalle de la subtarea.",
+      });
+    } finally {
+      setIsLoadingSubtaskModal(false);
+    }
+  };
+
+  const handleCreateAndOpenSubtaskModal = async (): Promise<void> => {
+    if (!currentTask?.id) {
+      sileo.info({
+        title: "Primero escribe un título",
+        description: "Ingresa el nombre de la tarea para poder añadirle subtareas.",
+      });
+      return;
+    }
+
+    const titleToUse = newSubtaskTitle.trim() || "Nueva subtarea";
+    setIsSavingSubtask(true);
+    try {
+      const res = await createSubtask({
+        parentId: currentTask.id,
+        projectId,
+        title: titleToUse,
+        assigneeId: newSubtaskAssigneeId || null,
+      });
+
+      if (res.success && res.data) {
+        setSubtasks((prev) => [...prev, res.data]);
+        setNewSubtaskTitle("");
+        setNewSubtaskAssigneeId("");
+        setIsAddingSubtask(false);
+        router.refresh();
+        await handleOpenSubtaskModal(res.data.id);
+      } else {
+        const errorMsg = !res.success ? res.error : "No se pudo crear la subtarea";
+        sileo.error({
+          title: "Error al crear subtarea",
+          description: errorMsg,
+        });
+      }
+    } catch {
+      sileo.error({
+        title: "Error al crear subtarea",
+        description: "Ocurrió un error inesperado.",
+      });
+    } finally {
+      setIsSavingSubtask(false);
+    }
+  };
 
   const handleAddSubtask = async (): Promise<void> => {
     if (!newSubtaskTitle.trim() || !currentTask?.id) return;
@@ -375,58 +458,96 @@ function TaskFormContent({
         {/* Columna Izquierda: Formulario principal de la tarea */}
         <div className="lg:col-span-7 flex flex-col gap-4 h-full">
           {/* Tarea Maestra (EPIC) */}
-          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <IconCrown className="size-4 text-purple-400" />
-              <span className="text-xs font-semibold text-text-primary">
-                Tarea Maestra (EPIC)
-              </span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isEpic}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setIsEpic(next);
-                  if (next) setParentId("");
-                  triggerImmediateSave({ isEpic: next, parentId: null });
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-purple-600" />
-            </label>
-          </div>
-
-          {!isEpic && availableEpics.length > 0 && (
-            <div className="flex items-center gap-2 pt-2 border-t border-purple-500/15">
-              <span className="text-[11px] text-text-secondary shrink-0">Pertenece al EPIC:</span>
-              <Select
-                value={parentId || "NONE"}
-                onValueChange={(val) => {
-                  const next = val === "NONE" ? "" : val;
-                  setParentId(next);
-                  triggerImmediateSave({ parentId: next || null });
-                }}
+          <div
+            className={cn(
+              "rounded-xl border p-3 flex flex-col gap-2 transition-colors",
+              isEpicDisabled
+                ? "border-border/60 bg-surface-elevated/20 opacity-90"
+                : "border-purple-500/20 bg-purple-500/5"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <IconCrown
+                  className={cn(
+                    "size-4",
+                    isEpicDisabled ? "text-text-muted" : "text-purple-400"
+                  )}
+                />
+                <span className="text-xs font-semibold text-text-primary">
+                  Tarea Maestra (EPIC)
+                </span>
+                {isEpicDisabled && (
+                  <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                    Deshabilitado para subtareas
+                  </span>
+                )}
+              </div>
+              <label
+                className={cn(
+                  "relative inline-flex items-center",
+                  isEpicDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                )}
+                title={
+                  isEpicDisabled
+                    ? "Una subtarea no puede ser marcada como EPIC"
+                    : undefined
+                }
               >
-                <SelectTrigger className="h-8 w-full rounded-xl border border-border bg-background px-2.5 text-xs text-text-primary focus:border-purple-400">
-                  <SelectValue placeholder="Ninguno (Tarea independiente)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE">Ninguno (Tarea independiente)</SelectItem>
-                  {availableEpics
-                    .filter((ep) => !currentTask || ep.id !== currentTask.id)
-                    .map((ep) => (
-                      <SelectItem key={ep.id} value={ep.id}>
-                        {ep.title}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                <input
+                  type="checkbox"
+                  checked={isEpic && !isEpicDisabled}
+                  disabled={isEpicDisabled}
+                  onChange={(e) => {
+                    if (isEpicDisabled) return;
+                    const next = e.target.checked;
+                    setIsEpic(next);
+                    if (next) setParentId("");
+                    triggerImmediateSave({ isEpic: next, parentId: null });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-disabled:opacity-50" />
+              </label>
             </div>
-          )}
-        </div>
+
+            {isEpicDisabled ? (
+              <div className="flex items-center gap-2 pt-2 border-t border-border/40 text-[11px] text-text-secondary">
+                <span className="shrink-0">Pertenece a la tarea:</span>
+                <span className="font-semibold text-text-primary truncate">
+                  {currentTask?.parent?.title || initialTask?.parent?.title || "Tarea principal"}
+                </span>
+              </div>
+            ) : (
+              !isEpic && availableEpics.length > 0 && (
+                <div className="flex items-center gap-2 pt-2 border-t border-purple-500/15">
+                  <span className="text-[11px] text-text-secondary shrink-0">Pertenece al EPIC:</span>
+                  <Select
+                    value={parentId || "NONE"}
+                    onValueChange={(val) => {
+                      const next = val === "NONE" ? "" : val;
+                      setParentId(next);
+                      triggerImmediateSave({ parentId: next || null });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-full rounded-xl border border-border bg-background px-2.5 text-xs text-text-primary focus:border-purple-400">
+                      <SelectValue placeholder="Ninguno (Tarea independiente)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">Ninguno (Tarea independiente)</SelectItem>
+                      {availableEpics
+                        .filter((ep) => !currentTask || ep.id !== currentTask.id)
+                        .map((ep) => (
+                          <SelectItem key={ep.id} value={ep.id}>
+                            {ep.title}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )
+            )}
+          </div>
 
         {/* Fila 1: Asignado (Izquierda) y Etiquetas (Derecha) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -665,21 +786,37 @@ function TaskFormContent({
                     key={st.id}
                     className="grid grid-cols-12 items-center px-3 py-2 text-xs hover:bg-surface-elevated/40 transition-colors group"
                   >
-                    <div className="col-span-7 sm:col-span-8 flex items-center gap-2 truncate pr-2">
-                      <span className="text-text-primary truncate">{st.title}</span>
+                    <div
+                      className="col-span-7 sm:col-span-8 flex items-center gap-2 truncate pr-2 cursor-pointer"
+                      onClick={() => void handleOpenSubtaskModal(st.id)}
+                    >
+                      <span className="text-text-primary truncate hover:text-primary transition-colors font-medium">
+                        {st.title}
+                      </span>
                     </div>
                     <div className="col-span-5 sm:col-span-4 flex items-center justify-between">
                       <span className="text-text-secondary truncate text-[11px]">
                         {st.assignee?.name || st.assignee?.email || "Sin asignar"}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteSubtask(st.id)}
-                        className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger p-1 rounded transition-opacity cursor-pointer"
-                        title="Eliminar subtarea"
-                      >
-                        <IconX className="size-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenSubtaskModal(st.id)}
+                          disabled={isLoadingSubtaskModal}
+                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-primary p-1 rounded-md hover:bg-surface-elevated transition-all cursor-pointer"
+                          title="Abrir detalles de la subtarea"
+                        >
+                          <IconExternalLink className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteSubtask(st.id)}
+                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger p-1 rounded-md hover:bg-surface-elevated transition-all cursor-pointer"
+                          title="Eliminar subtarea"
+                        >
+                          <IconX className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -691,7 +828,7 @@ function TaskFormContent({
                       <input
                         type="text"
                         autoFocus
-                        placeholder="Título de la subtarea..."
+                        placeholder="Título de la subtarea (Enter para agregar)..."
                         value={newSubtaskTitle}
                         onChange={(e) => setNewSubtaskTitle(e.target.value)}
                         onKeyDown={(e) => {
@@ -701,6 +838,7 @@ function TaskFormContent({
                           } else if (e.key === "Escape") {
                             setIsAddingSubtask(false);
                             setNewSubtaskTitle("");
+                            setNewSubtaskAssigneeId("");
                           }
                         }}
                         className="w-full text-xs bg-background border border-primary/50 rounded-lg px-2.5 py-1 text-text-primary focus:outline-none"
@@ -729,23 +867,16 @@ function TaskFormContent({
                       </div>
                       <button
                         type="button"
-                        onClick={() => void handleAddSubtask()}
-                        disabled={isSavingSubtask || !newSubtaskTitle.trim()}
-                        className="p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
-                        title="Guardar"
+                        onClick={() => void handleCreateAndOpenSubtaskModal()}
+                        disabled={isSavingSubtask}
+                        className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors cursor-pointer"
+                        title="Abrir detalles en modal"
                       >
-                        <IconCheck className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsAddingSubtask(false);
-                          setNewSubtaskTitle("");
-                        }}
-                        className="p-1 rounded text-text-muted hover:text-text-primary cursor-pointer"
-                        title="Cancelar"
-                      >
-                        <IconX className="size-3.5" />
+                        {isSavingSubtask ? (
+                          <IconLoader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <IconExternalLink className="size-3.5" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -790,6 +921,47 @@ function TaskFormContent({
         />
       </div>
     </div>
+
+    {/* Subtask Modal */}
+    {subtaskModalTask && (
+      <TaskFormDialog
+        projectId={projectId}
+        members={members}
+        availableEpics={availableEpics}
+        customStatuses={customStatuses}
+        customPriorities={customPriorities}
+        taskToEdit={subtaskModalTask}
+        isOpenControlled={Boolean(subtaskModalTask)}
+        isSubtask
+        onOpenChangeControlled={(open) => {
+          if (!open) {
+            setSubtaskModalTask(null);
+            if (currentTask?.id) {
+              void getSubtasks(currentTask.id).then((res) => {
+                if (res.success && res.data) {
+                  setSubtasks(res.data);
+                }
+              });
+            }
+          }
+        }}
+        onTaskCreatedOrUpdated={(updatedTask) => {
+          setSubtasks((prev) =>
+            prev.map((s) =>
+              s.id === updatedTask.id
+                ? {
+                    ...s,
+                    title: updatedTask.title,
+                    bucket: updatedTask.bucket,
+                    assigneeId: updatedTask.assigneeId,
+                    assignee: updatedTask.assignee,
+                  }
+                : s
+            )
+          );
+        }}
+      />
+    )}
   </>
 );
 }
@@ -809,6 +981,7 @@ export function TaskFormDialog({
   isOpen: isOpenAlias,
   onOpenChange: onOpenChangeAlias,
   onTaskCreatedOrUpdated,
+  isSubtask,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
@@ -832,7 +1005,12 @@ export function TaskFormDialog({
     <>
       <Dialog open={isOpen} onOpenChange={setOpen}>
         {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-        <DialogContent className="border-border bg-surface w-[95vw] sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl min-h-[85vh] max-h-[94vh] overflow-y-auto p-6 sm:p-8 flex flex-col">
+        <DialogContent
+          className={cn(
+            "border-border bg-surface w-[95vw] sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl min-h-[85vh] max-h-[94vh] overflow-y-auto p-6 sm:p-8 flex flex-col",
+            isSubtask && "z-[60]"
+          )}
+        >
           {isOpen && (
             <TaskFormContent
               key={initialTask?.id ?? "new-task"}
@@ -842,8 +1020,11 @@ export function TaskFormDialog({
               members={members}
               availableEpics={availableEpics}
               priorities={priorities}
+              customStatuses={statuses}
+              customPriorities={priorities}
               onOpenConfig={() => setIsConfigOpen(true)}
               onTaskCreatedOrUpdated={onTaskCreatedOrUpdated}
+              isSubtask={isSubtask}
             />
           )}
         </DialogContent>

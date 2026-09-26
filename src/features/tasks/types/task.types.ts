@@ -107,24 +107,33 @@ export const createTaskSchema = z
   .refine((data) => data.dueDate >= data.startDate, {
     message: "La fecha de fin no puede ser anterior a la fecha de inicio",
     path: ["dueDate"],
+  })
+  .refine((data) => !(Boolean(data.parentId) && data.isEpic), {
+    message: "Una subtarea no puede ser marcada como EPIC",
+    path: ["isEpic"],
   });
 
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 
-export const updateTaskSchema = z.object({
-  taskId: z.string().uuid("ID de tarea inválido"),
-  title: z.string().trim().min(1).max(255).optional(),
-  description: z.string().trim().max(2000).optional().nullable(),
-  label: z.string().trim().max(50).optional(),
-  bucket: z.string().trim().max(50).optional(),
-  startDate: z.string().regex(dateRegex).optional(),
-  dueDate: z.string().regex(dateRegex).optional(),
-  predecessors: z.string().trim().max(500).optional().nullable(),
-  isEpic: z.boolean().optional(),
-  showSubtasksOnCard: z.boolean().optional(),
-  parentId: z.string().uuid().optional().nullable(),
-  assigneeId: z.string().uuid().optional().nullable(),
-});
+export const updateTaskSchema = z
+  .object({
+    taskId: z.string().uuid("ID de tarea inválido"),
+    title: z.string().trim().min(1).max(255).optional(),
+    description: z.string().trim().max(2000).optional().nullable(),
+    label: z.string().trim().max(50).optional(),
+    bucket: z.string().trim().max(50).optional(),
+    startDate: z.string().regex(dateRegex).optional(),
+    dueDate: z.string().regex(dateRegex).optional(),
+    predecessors: z.string().trim().max(500).optional().nullable(),
+    isEpic: z.boolean().optional(),
+    showSubtasksOnCard: z.boolean().optional(),
+    parentId: z.string().uuid().optional().nullable(),
+    assigneeId: z.string().uuid().optional().nullable(),
+  })
+  .refine((data) => !(Boolean(data.parentId) && data.isEpic), {
+    message: "Una subtarea no puede ser marcada como EPIC",
+    path: ["isEpic"],
+  });
 
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 

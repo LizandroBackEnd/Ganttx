@@ -29,6 +29,13 @@ function parseDateStringToUtcDate(dateString: string): Date {
   return new Date(`${dateString}T00:00:00.000Z`);
 }
 
+function formatLocalDateToIso(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function createTask(
   input: CreateTaskInput
 ): Promise<TaskActionResult<TaskDTO>> {
@@ -125,13 +132,6 @@ export async function createTask(
       },
     });
 
-    const formatLocalDateToIso = (d: Date): string => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-
     const taskDto: TaskDTO = {
       id: task.id,
       title: task.title,
@@ -186,6 +186,7 @@ export async function updateTask(
     where: { id: taskId },
     select: {
       projectId: true,
+      parentId: true,
       project: {
         select: {
           members: {
@@ -199,6 +200,12 @@ export async function updateTask(
 
   if (!task || task.project.members.length === 0) {
     return { success: false, error: "Permiso denegado: debes ser miembro del proyecto" };
+  }
+
+  // Validación: una subtarea no puede ser marcada como EPIC
+  const effectiveParentId = fields.parentId !== undefined ? fields.parentId : task.parentId;
+  if (fields.isEpic && effectiveParentId) {
+    return { success: false, error: "Una subtarea no puede ser marcada como EPIC" };
   }
 
   try {
@@ -586,6 +593,118 @@ export async function deleteSubtask(
     return { success: true, data: undefined };
   } catch {
     return { success: false, error: "Error al eliminar la subtarea" };
+  }
+}
+
+export async function getTaskDetails(
+  taskId: string
+): Promise<TaskActionResult<TaskDTO>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const userId = session.user.id;
+
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        label: true,
+        bucket: true,
+        startDate: true,
+        dueDate: true,
+        predecessors: true,
+        isEpic: true,
+        showSubtasksOnCard: true,
+        parentId: true,
+        projectId: true,
+        assigneeId: true,
+        creatorId: true,
+        createdAt: true,
+        updatedAt: true,
+        parent: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+        subtasks: {
+          select: {
+            id: true,
+            title: true,
+            bucket: true,
+            assigneeId: true,
+            assignee: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+        project: {
+          select: {
+            members: {
+              where: { userId },
+              select: { role: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!task || task.project.members.length === 0) {
+      return { success: false, error: "Tarea no encontrada o sin acceso" };
+    }
+
+    const taskDto: TaskDTO = {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      label: task.label,
+      bucket: task.bucket,
+      startDate: formatLocalDateToIso(task.startDate),
+      dueDate: formatLocalDateToIso(task.dueDate),
+      predecessors: task.predecessors,
+      isEpic: task.isEpic,
+      showSubtasksOnCard: task.showSubtasksOnCard,
+      parentId: task.parentId,
+      parent: task.parent,
+      projectId: task.projectId,
+      assigneeId: task.assigneeId,
+      creatorId: task.creatorId,
+      assignee: task.assignee,
+      subtasks: task.subtasks.map((st) => ({
+        id: st.id,
+        title: st.title,
+        bucket: st.bucket,
+        assigneeId: st.assigneeId,
+        assignee: st.assignee,
+      })),
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+    };
+
+    return { success: true, data: taskDto };
+  } catch {
+    return { success: false, error: "Error al obtener los detalles de la tarea" };
   }
 }
 
