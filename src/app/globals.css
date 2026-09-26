@@ -15,24 +15,6 @@
   --font-heading: "Montserrat Alternates", var(--font-montserrat-alternates), sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 
-  /* Surfaces — Clean Deep Charcoal & Slate */
-  --color-background: #08090d;
-  --color-surface: #10131a;
-  --color-surface-elevated: #161b24;
-  --color-border: #1f2633;
-  --color-border-subtle: #171d27;
-
-  /* Primary Accent — Code Verse Neon Mint / Emerald */
-  --color-primary: #00f28e;
-  --color-primary-hover: #00ff9d;
-  --color-primary-muted: #064e3b;
-  --color-primary-foreground: #04120a;
-
-  /* Text */
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-
   /* Semantic / Multi-accent gradients */
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -48,7 +30,7 @@
   --color-priority-urg: #ef4444;
 
   /* Status */
-  --color-status-todo: #64748b;
+  --color-status-todo: var(--status-todo);
   --color-status-progress: #0ea5e9;
   --color-status-review: #f59e0b;
   --color-status-done: #10b981;
@@ -62,11 +44,28 @@
 }
 
 /* ───────────────────────────────────────────
- * shadcn/ui token bridge
+ * shadcn/ui and dynamic token bridge
  * ─────────────────────────────────────────── */
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
+
+  /* Ganttx Dynamic Surfaces & Colors */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-muted: var(--primary-muted);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -100,16 +99,78 @@
 }
 
 :root {
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: #f8fafc;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --primary: #059669;
+  --primary-hover: #047857;
+  --primary-muted: #d1fae5;
+  --primary-foreground: #ffffff;
+
+  --status-todo: #94a3b8;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --input: #e2e8f0;
+  --ring: #059669;
+  --chart-1: #059669;
+  --chart-2: #0ea5e9;
+  --chart-3: #f59e0b;
+  --chart-4: #f97316;
+  --chart-5: #ef4444;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #059669;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #059669;
+}
+
+.dark {
   color-scheme: dark;
-  /* shadcn core — mapped to Ganttx dark palette */
   --background: #08090d;
   --foreground: #f8fafc;
+  --surface: #10131a;
+  --surface-elevated: #161b24;
+  --border: #1f2633;
+  --border-subtle: #171d27;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --primary: #00f28e;
+  --primary-hover: #00ff9d;
+  --primary-muted: #064e3b;
+  --primary-foreground: #04120a;
+
+  --status-todo: #64748b;
+
   --card: #10131a;
   --card-foreground: #f8fafc;
   --popover: #10131a;
   --popover-foreground: #f8fafc;
-  --primary: #00f28e;
-  --primary-foreground: #04120a;
   --secondary: #161b24;
   --secondary-foreground: #f8fafc;
   --muted: #161b24;
@@ -117,7 +178,6 @@
   --accent: #161b24;
   --accent-foreground: #f8fafc;
   --destructive: #ef4444;
-  --border: #1f2633;
   --input: #1f2633;
   --ring: #00f28e;
   --chart-1: #00f28e;

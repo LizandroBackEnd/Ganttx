@@ -10,25 +10,16 @@ export type CalendarSubMode = "month" | "week" | "day" | "year";
 export interface ProjectSidebarProps {
   readonly projectId: string;
   readonly primaryView: WorkspacePrimaryView;
-  readonly calendarSubMode: CalendarSubMode;
   readonly onSelectPrimaryView: (view: WorkspacePrimaryView) => void;
-  readonly onSelectCalendarSubMode: (subMode: CalendarSubMode) => void;
   readonly taskCount: number;
+  readonly calendarSubMode?: CalendarSubMode;
+  readonly onSelectCalendarSubMode?: (subMode: CalendarSubMode) => void;
 }
-
-const calendarSubOptions: { id: CalendarSubMode; label: string }[] = [
-  { id: "month", label: "Mes" },
-  { id: "week", label: "Semana" },
-  { id: "day", label: "Día" },
-  { id: "year", label: "Año" },
-];
 
 export function ProjectSidebar({
   projectId,
   primaryView,
-  calendarSubMode,
   onSelectPrimaryView,
-  onSelectCalendarSubMode,
   taskCount,
 }: ProjectSidebarProps): React.JSX.Element {
   return (
@@ -38,7 +29,22 @@ export function ProjectSidebar({
           Vistas del Proyecto
         </div>
 
-        {/* 1. Tareas (Primera Opción) */}
+        {/* 1. Calendario */}
+        <button
+          type="button"
+          onClick={() => onSelectPrimaryView("calendar")}
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all text-left",
+            primaryView === "calendar"
+              ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+              : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
+          )}
+        >
+          <IconCalendar className="size-4 shrink-0" />
+          <span>Calendario</span>
+        </button>
+
+        {/* 2. Tareas (Segunda Opción) */}
         <button
           type="button"
           onClick={() => onSelectPrimaryView("tasks")}
@@ -64,49 +70,6 @@ export function ProjectSidebar({
             {taskCount}
           </span>
         </button>
-
-        {/* 2. Calendario (Segunda Opción con Mes, Semana, Día, Año) */}
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => onSelectPrimaryView("calendar")}
-            className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-all text-left",
-              primaryView === "calendar"
-                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
-            )}
-          >
-            <div className="flex items-center gap-2.5">
-              <IconCalendar className="size-4 shrink-0" />
-              <span>Calendario</span>
-            </div>
-          </button>
-
-          {/* Sub-opciones de Calendario cuando está activo */}
-          {primaryView === "calendar" && (
-            <div className="ml-4 pl-3.5 border-l border-border/80 flex flex-col gap-1 py-1">
-              {calendarSubOptions.map((sub) => {
-                const isSubActive = calendarSubMode === sub.id;
-                return (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => onSelectCalendarSubMode(sub.id)}
-                    className={cn(
-                      "flex items-center rounded-lg px-2.5 py-1.5 text-xs transition-colors text-left",
-                      isSubActive
-                        ? "bg-surface-elevated text-primary font-semibold shadow-2xs"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-elevated/50"
-                    )}
-                  >
-                    <span>{sub.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* 3. Cronograma Gantt (Última Opción) */}
         <button

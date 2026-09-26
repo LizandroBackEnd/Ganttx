@@ -33,7 +33,7 @@ export function ProjectWorkspace({
 
   const viewParam = searchParams.get("view");
   const primaryView: WorkspacePrimaryView =
-    viewParam === "calendar" || viewParam === "gantt" ? viewParam : "tasks";
+    viewParam === "tasks" || viewParam === "gantt" ? viewParam : "calendar";
 
   const calViewParam = searchParams.get("calView");
   const calendarSubMode: CalendarSubMode =
@@ -88,9 +88,7 @@ export function ProjectWorkspace({
       <ProjectSidebar
         projectId={project.id}
         primaryView={primaryView}
-        calendarSubMode={calendarSubMode}
         onSelectPrimaryView={handleSelectPrimaryView}
-        onSelectCalendarSubMode={handleSelectCalendarSubMode}
         taskCount={tasks.length}
       />
 

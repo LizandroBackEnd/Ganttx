@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat_Alternates, Geist_Mono } from "next/font/google";
+import { ThemeProvider, ThemeScript } from "@/shared/components";
 import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -28,9 +29,11 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${montserratAlternates.variable} ${montserratAlternates.className} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${montserratAlternates.variable} ${montserratAlternates.className} ${geistMono.variable} h-full antialiased dark`}
     >
       <head>
+        <ThemeScript />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -44,7 +47,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${montserratAlternates.className} min-h-full flex flex-col bg-background text-text-primary`}>
-        {children}
+        <ThemeProvider defaultTheme="dark">
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

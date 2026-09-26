@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { UserMenu } from "@/features/auth";
+import { ThemeToggle } from "@/shared/components";
 import { IconTimeline } from "@tabler/icons-react";
 
 export default async function DashboardLayout({
@@ -39,7 +40,10 @@ export default async function DashboardLayout({
           </nav>
         </div>
 
-        <UserMenu user={session.user} />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <UserMenu user={session.user} />
+        </div>
       </header>
 
       {/* Main Content Area */}
