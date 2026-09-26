@@ -97,7 +97,7 @@ export const createTaskSchema = z
     projectId: z.string().uuid("ID de proyecto inválido"),
     title: z.string().trim().min(1, "El nombre de la tarea es obligatorio").max(255),
     description: z.string().trim().max(2000).optional().nullable(),
-    label: z.string().trim().min(1).max(50).default("MEDIUM"),
+    label: z.string().trim().max(50).default("MEDIUM"),
     bucket: z.string().trim().min(1, "El bucket es obligatorio").max(50),
     startDate: z.string().regex(dateRegex, "Formato de fecha de inicio inválido"),
     dueDate: z.string().regex(dateRegex, "Formato de fecha de fin inválido"),

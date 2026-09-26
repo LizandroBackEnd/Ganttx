@@ -30,6 +30,13 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 - [x] TASK-8: Subtask independent label/etiqueta support with selection dropdown in inline row, badge in subtasks list, and synchronization in subtask modal.
 - [x] TASK-9: Subtask due date validation against parent task/epic (`dueDate <= parent.dueDate`) in UI (DatePicker maxDate) and backend (`createTask`, `updateTask`, `updateTaskDates`).
 - [x] TASK-10: Fix portal z-index layering for `SelectContent` (`z-100`) and `PopoverContent` (`z-100`), ensuring Asignado, Etiquetas, and DatePicker dropdowns can be clicked and edited within the subtask modal.
+- [x] TASK-11: Multi-label support on tasks and subtasks with TaskCard badge row rendering and subtask label isolation:
+  - Created `TaskLabelSelector` multi-select popover with pill badges and quick removal.
+  - Updated `TaskPriorityBadge` to parse comma-separated labels and render all badges side-by-side.
+  - Enabled multi-label selection in `TaskFormDialog` for main tasks and subtasks (both modal and inline creation row).
+  - Main task labels rendered on `TaskCard` next to EPIC badge.
+  - Subtask labels strictly isolated from `TaskCard`, appearing only in their own view (subtask list and subtask modal).
+  - Updated `TaskBoard` priority filter to support multi-label tasks.
 
 ## Verification Evidence
 - `bun run lint` (ESLint) completed with 0 errors and 0 warnings.
@@ -45,3 +52,7 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 - Backend mutations (`createTask`, `updateTask`, `updateTaskDates`) enforce `subtask.startDate >= parent.startDate` AND `subtask.dueDate <= parent.dueDate`.
 - `SelectContent` and `PopoverContent` use `z-100` so Assignee and Label dropdowns and DatePickers appear above the subtask modal (`z-60`) and are fully interactive.
 - Subtask dialog overlay uses `z-55` to layer properly over the parent modal (`z-50`).
+- `TaskPriorityBadge` splits comma-separated labels (e.g. `P3,P2,P1`) and renders discrete colored badges for each label.
+- `TaskCard` renders all assigned labels of the main task in the badge row (`[P3] [P2] [P1] [EPIC]`).
+- `TaskCard` checklist items display only completion status, subtask title, and assignee avatar; subtask labels never appear on the parent task card.
+- `TaskLabelSelector` enables toggling multiple labels with checkmarks, responsive pills with `x` remove buttons, and inline customize action.

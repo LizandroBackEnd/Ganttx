@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -23,7 +23,8 @@ import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
 import { TaskCommentsPanel } from "./task-comments-panel";
-import { TaskPriorityBadge } from "./task-priority-badge";
+import { TaskPriorityBadge, parseTaskLabels } from "./task-priority-badge";
+import { TaskLabelSelector } from "./task-label-selector";
 import {
   createTask,
   updateTask,
@@ -167,6 +168,13 @@ function TaskFormContent({
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
   const bucket = initialTask?.bucket ?? defaultStatus ?? "TODO";
   const [label, setLabel] = useState<string>(initialTask?.label ?? "MEDIUM");
+  const currentLabels = useMemo(() => parseTaskLabels(label), [label]);
+
+  const handleLabelsChange = (newLabels: string[]): void => {
+    const nextVal = newLabels.join(",");
+    setLabel(nextVal);
+    triggerImmediateSave({ label: nextVal });
+  };
   const [description, setDescription] = useState<string>(initialTask?.description ?? "");
   const [showSubtasksOnCard, setShowSubtasksOnCard] = useState<boolean>(
     initialTask?.showSubtasksOnCard ?? false
@@ -183,7 +191,7 @@ function TaskFormContent({
   const [isAddingSubtask, setIsAddingSubtask] = useState<boolean>(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState<string>("");
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>("");
-  const [newSubtaskLabel, setNewSubtaskLabel] = useState<string>("");
+  const [newSubtaskLabels, setNewSubtaskLabels] = useState<string[]>([]);
   const [isSavingSubtask, setIsSavingSubtask] = useState<boolean>(false);
 
   // Subtask modal state
@@ -236,7 +244,10 @@ function TaskFormContent({
     }
 
     const titleToUse = newSubtaskTitle.trim() || "Nueva subtarea";
-    const labelToUse = newSubtaskLabel || label || priorities[0]?.id || "MEDIUM";
+    const labelToUse =
+      newSubtaskLabels.length > 0
+        ? newSubtaskLabels.join(",")
+        : (label || priorities[0]?.id || "MEDIUM");
     setIsSavingSubtask(true);
     try {
       const res = await createSubtask({
@@ -251,7 +262,7 @@ function TaskFormContent({
         setSubtasks((prev) => [...prev, res.data]);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
-        setNewSubtaskLabel("");
+        setNewSubtaskLabels([]);
         setIsAddingSubtask(false);
         router.refresh();
         await handleOpenSubtaskModal(res.data.id);
@@ -274,7 +285,10 @@ function TaskFormContent({
 
   const handleAddSubtask = async (): Promise<void> => {
     if (!newSubtaskTitle.trim() || !currentTask?.id) return;
-    const labelToUse = newSubtaskLabel || label || priorities[0]?.id || "MEDIUM";
+    const labelToUse =
+      newSubtaskLabels.length > 0
+        ? newSubtaskLabels.join(",")
+        : (label || priorities[0]?.id || "MEDIUM");
     setIsSavingSubtask(true);
     try {
       const res = await createSubtask({
@@ -288,7 +302,7 @@ function TaskFormContent({
         setSubtasks((prev) => [...prev, res.data]);
         setNewSubtaskTitle("");
         setNewSubtaskAssigneeId("");
-        setNewSubtaskLabel("");
+        setNewSubtaskLabels([]);
         setIsAddingSubtask(false);
         router.refresh();
       } else {
@@ -597,53 +611,12 @@ function TaskFormContent({
                 <span>Personalizar</span>
               </button>
             </div>
-            <Select
-              value={label}
-              onValueChange={(val) => {
-                setLabel(val);
-                triggerImmediateSave({ label: val });
-              }}
-            >
-              <SelectTrigger className="h-9 w-full rounded-xl border border-border bg-background px-3 text-xs text-text-primary">
-                <SelectValue placeholder="Seleccionar etiqueta">
-                  {(() => {
-                    const sel = priorities.find((p) => p.id === label);
-                    if (!sel) return label;
-                    const c = sel.color || "#0284c7";
-                    return (
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="size-2 rounded-full shrink-0"
-                          style={{ backgroundColor: c }}
-                        />
-                        <span className="truncate">{sel.label}</span>
-                      </span>
-                    );
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {priorities.map((pr) => {
-                  const prColor = pr.color || "#0284c7";
-                  return (
-                    <SelectItem key={pr.id} value={pr.id}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border"
-                          style={{
-                            backgroundColor: `${prColor}22`,
-                            color: prColor,
-                            borderColor: `${prColor}55`,
-                          }}
-                        >
-                          {pr.label}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <TaskLabelSelector
+              selectedLabels={currentLabels}
+              onChange={handleLabelsChange}
+              priorities={priorities}
+              onOpenConfig={onOpenConfig}
+            />
           </div>
         </div>
 
@@ -838,7 +811,7 @@ function TaskFormContent({
                         {st.title}
                       </span>
                     </div>
-                    <div className="col-span-3 sm:col-span-3 flex items-center">
+                    <div className="col-span-3 sm:col-span-3 flex flex-wrap items-center gap-1">
                       <TaskPriorityBadge
                         label={st.label}
                         customPriorities={priorities}
@@ -889,40 +862,20 @@ function TaskFormContent({
                             setIsAddingSubtask(false);
                             setNewSubtaskTitle("");
                             setNewSubtaskAssigneeId("");
-                            setNewSubtaskLabel("");
+                            setNewSubtaskLabels([]);
                           }
                         }}
                         className="w-full text-xs bg-background border border-primary/50 rounded-lg px-2.5 py-1 text-text-primary focus:outline-none"
                       />
                     </div>
                     <div className="col-span-3 sm:col-span-3">
-                      <Select
-                        value={newSubtaskLabel || label || priorities[0]?.id || "MEDIUM"}
-                        onValueChange={setNewSubtaskLabel}
-                      >
-                        <SelectTrigger className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-text-primary">
-                          <SelectValue placeholder="Etiqueta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priorities.map((pr) => {
-                            const prColor = pr.color || "#0284c7";
-                            return (
-                              <SelectItem key={pr.id} value={pr.id}>
-                                <span
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border"
-                                  style={{
-                                    backgroundColor: `${prColor}22`,
-                                    color: prColor,
-                                    borderColor: `${prColor}55`,
-                                  }}
-                                >
-                                  {pr.label}
-                                </span>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                      <TaskLabelSelector
+                        compact
+                        selectedLabels={newSubtaskLabels}
+                        onChange={setNewSubtaskLabels}
+                        priorities={priorities}
+                        placeholder="Etiqueta"
+                      />
                     </div>
                     <div className="col-span-4 sm:col-span-4 flex items-center gap-1.5">
                       <div className="flex-1 min-w-0">

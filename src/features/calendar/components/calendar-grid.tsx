@@ -32,7 +32,8 @@ function formatLocalDateToIsoString(date: Date): string {
 }
 
 function getTaskChipStyle(label: string): string {
-  switch (label) {
+  const primary = label.split(",")[0]?.trim() ?? label;
+  switch (primary) {
     case "LOW":
       return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:border-emerald-500/50";
     case "MEDIUM":

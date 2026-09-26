@@ -92,7 +92,9 @@ export function GanttBar({
       };
     }
 
-    switch (task.label) {
+    const primaryLabel = task.label.split(",")[0]?.trim() ?? task.label;
+
+    switch (primaryLabel) {
       case "LOW":
         return {
           bg: "bg-gradient-to-r from-emerald-500/15 via-teal-500/20 to-emerald-500/25 border-emerald-500/40 hover:border-emerald-400",

@@ -6,6 +6,7 @@ import { TaskBucketColumn } from "./task-bucket-column";
 import { TaskTable } from "./task-table";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
+import { parseTaskLabels } from "./task-priority-badge";
 import {
   DeleteBucketConfirmToast,
   SKIP_BUCKET_DELETE_KEY,
@@ -120,7 +121,9 @@ export function TaskBoard({
           : task.assigneeId === selectedAssignee);
 
       const matchesPriority =
-        selectedPriority === "ALL" || task.label === selectedPriority;
+        selectedPriority === "ALL" ||
+        task.label === selectedPriority ||
+        parseTaskLabels(task.label).includes(selectedPriority);
 
       return matchesSearch && matchesAssignee && matchesPriority;
     });

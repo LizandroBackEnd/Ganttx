@@ -19,13 +19,31 @@ const priorityStyles: Record<string, string> = {
   URGENT: "bg-gradient-to-r from-rose-500/20 to-red-500/20 text-rose-300 border-rose-500/40 font-bold shadow-[0_0_10px_rgba(244,63,94,0.15)]",
 };
 
-export function TaskPriorityBadge({
-  priority,
-  label: labelProp,
+export function parseTaskLabels(raw?: string | null): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+export function formatTaskLabels(labels: readonly string[]): string {
+  return Array.from(new Set(labels.map((s) => s.trim()).filter(Boolean))).join(",");
+}
+
+export function SingleTaskPriorityBadge({
+  value,
   customPriorities,
   className,
-}: TaskPriorityBadgeProps): React.JSX.Element {
-  const value = labelProp ?? priority ?? "MEDIUM";
+}: {
+  readonly value: string;
+  readonly customPriorities?: readonly CustomPriorityOption[] | null;
+  readonly className?: string;
+}): React.JSX.Element {
   const custom = customPriorities?.find(
     (p) => p.id === value || p.label.toUpperCase() === value.toUpperCase()
   );
@@ -59,4 +77,42 @@ export function TaskPriorityBadge({
   );
 }
 
+export function TaskPriorityBadge({
+  priority,
+  label: labelProp,
+  customPriorities,
+  className,
+}: TaskPriorityBadgeProps): React.JSX.Element | null {
+  const raw = labelProp ?? priority ?? "MEDIUM";
+  const labels = parseTaskLabels(raw);
+
+  if (labels.length === 0) {
+    return null;
+  }
+
+  if (labels.length === 1) {
+    return (
+      <SingleTaskPriorityBadge
+        value={labels[0]}
+        customPriorities={customPriorities}
+        className={className}
+      />
+    );
+  }
+
+  return (
+    <>
+      {labels.map((val) => (
+        <SingleTaskPriorityBadge
+          key={val}
+          value={val}
+          customPriorities={customPriorities}
+          className={className}
+        />
+      ))}
+    </>
+  );
+}
+
 export const TaskLabelBadge = TaskPriorityBadge;
+
