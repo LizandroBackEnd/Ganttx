@@ -39,7 +39,7 @@ export function TaskTable({
     if (propEpics) return [...propEpics];
     return tasks
       .filter((t) => t.isEpic)
-      .map((t) => ({ id: t.id, title: t.title, customId: t.customId }));
+      .map((t) => ({ id: t.id, title: t.title }));
   }, [propEpics, tasks]);
 
   const filterTabs = useMemo<{ id: string; label: string }[]>(() => {

@@ -6,7 +6,7 @@ import { TaskStatusBadge } from "./task-status-badge";
 import { TaskPriorityBadge } from "./task-priority-badge";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { updateTaskStatus, deleteTask } from "../api/task-mutations";
-import { IconCheck, IconPencil, IconTrash, IconCrown } from "@tabler/icons-react";
+import { IconCheck, IconPencil, IconTrash, IconCrown, IconDiamond } from "@tabler/icons-react";
 import { sileo } from "sileo";
 import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
 
@@ -103,14 +103,15 @@ export function TaskRow({
             )}
           </button>
 
-          {/* 1. Custom ID Badge */}
-          {task.customId && (
-            <span className="shrink-0 rounded-md bg-surface-elevated border border-border px-2 py-0.5 text-[11px] font-mono font-bold text-primary">
-              {task.customId}
+          {/* Milestone Badge */}
+          {task.isMilestone && (
+            <span className="shrink-0 rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[11px] font-bold text-amber-500 flex items-center gap-1">
+              <IconDiamond className="size-3" />
+              <span>Hito</span>
             </span>
           )}
 
-          {/* 2. Actividad / Title */}
+          {/* Title */}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {task.isEpic && (
@@ -121,7 +122,7 @@ export function TaskRow({
               )}
               {task.parent && !task.isEpic && (
                 <span className="text-[10px] font-mono text-purple-400/90 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
-                  {task.parent.customId ? `[${task.parent.customId}] ` : ""}{task.parent.title}
+                  {task.parent.title}
                 </span>
               )}
               <span
@@ -143,33 +144,12 @@ export function TaskRow({
 
         {/* Right columns */}
         <div className="flex flex-wrap items-center gap-3 shrink-0 text-xs text-text-muted">
-          {/* 3. Requerimiento */}
-          {task.requirement && (
-            <span className="rounded bg-surface-elevated/80 border border-border/70 px-1.5 py-0.5 font-mono text-[10px] text-text-secondary" title="Requerimiento">
-              {task.requirement}
-            </span>
-          )}
-
-          {/* 4. Sprint */}
-          {task.sprint && (
-            <span className="rounded bg-surface-elevated/80 border border-border/70 px-1.5 py-0.5 text-[10px] text-text-secondary" title="Sprint">
-              S{task.sprint}
-            </span>
-          )}
-
-          {/* 6. Duración */}
-          {task.durationDays && (
-            <span className="font-mono text-[11px] text-text-muted" title="Duración">
-              {task.durationDays}d
-            </span>
-          )}
-
-          {/* 7 & 8. Fechas */}
+          {/* Fechas */}
           <span className="font-mono text-[11px] text-text-secondary">
             {task.startDate.slice(5)} → {task.dueDate.slice(5)}
           </span>
 
-          {/* 9. Predecesoras */}
+          {/* Predecesoras */}
           {task.predecessors && (
             <span className="rounded bg-surface-elevated/60 px-1.5 py-0.5 font-mono text-[10px] text-text-muted" title={`Predecesoras: ${task.predecessors}`}>
               Pred: {task.predecessors}

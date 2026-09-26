@@ -106,9 +106,7 @@ export function TaskBoard({
       const matchesSearch =
         !searchQuery.trim() ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.customId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.sprint?.toLowerCase().includes(searchQuery.toLowerCase());
+        task.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesAssignee =
         selectedAssignee === "ALL" ||

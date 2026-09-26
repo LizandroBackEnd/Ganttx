@@ -46,24 +46,20 @@ export async function getTasksByProjectId(
     },
     select: {
       id: true,
-      customId: true,
       title: true,
       description: true,
-      requirement: true,
-      sprint: true,
-      durationDays: true,
       priority: true,
       status: true,
       startDate: true,
       dueDate: true,
       predecessors: true,
       isEpic: true,
+      isMilestone: true,
       parentId: true,
       parent: {
         select: {
           id: true,
           title: true,
-          customId: true,
         },
       },
       _count: {
@@ -94,24 +90,20 @@ export async function getTasksByProjectId(
 
   return tasks.map((t) => ({
     id: t.id,
-    customId: t.customId,
     title: t.title,
     description: t.description,
-    requirement: t.requirement,
-    sprint: t.sprint,
-    durationDays: t.durationDays,
     priority: t.priority,
     status: t.status,
     startDate: formatLocalDateToIsoString(t.startDate),
     dueDate: formatLocalDateToIsoString(t.dueDate),
     predecessors: t.predecessors,
     isEpic: t.isEpic,
+    isMilestone: t.isMilestone,
     parentId: t.parentId,
     parent: t.parent
       ? {
           id: t.parent.id,
           title: t.parent.title,
-          customId: t.parent.customId,
         }
       : null,
     subtasksCount: t._count.subtasks,
@@ -143,24 +135,20 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
     where: { id: taskId },
     select: {
       id: true,
-      customId: true,
       title: true,
       description: true,
-      requirement: true,
-      sprint: true,
-      durationDays: true,
       priority: true,
       status: true,
       startDate: true,
       dueDate: true,
       predecessors: true,
       isEpic: true,
+      isMilestone: true,
       parentId: true,
       parent: {
         select: {
           id: true,
           title: true,
-          customId: true,
         },
       },
       _count: {
@@ -198,24 +186,20 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
 
   return {
     id: task.id,
-    customId: task.customId,
     title: task.title,
     description: task.description,
-    requirement: task.requirement,
-    sprint: task.sprint,
-    durationDays: task.durationDays,
     priority: task.priority,
     status: task.status,
     startDate: formatLocalDateToIsoString(task.startDate),
     dueDate: formatLocalDateToIsoString(task.dueDate),
     predecessors: task.predecessors,
     isEpic: task.isEpic,
+    isMilestone: task.isMilestone,
     parentId: task.parentId,
     parent: task.parent
       ? {
           id: task.parent.id,
           title: task.parent.title,
-          customId: task.parent.customId,
         }
       : null,
     subtasksCount: task._count.subtasks,

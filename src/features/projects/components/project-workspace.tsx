@@ -80,7 +80,7 @@ export function ProjectWorkspace({
   // Compute available epics for hierarchy picker
   const availableEpics = tasks
     .filter((t) => t.isEpic)
-    .map((t) => ({ id: t.id, title: t.title, customId: t.customId }));
+    .map((t) => ({ id: t.id, title: t.title }));
 
   return (
     <div className="flex flex-col md:flex-row flex-1 min-h-0 h-full items-stretch overflow-hidden">

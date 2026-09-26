@@ -138,18 +138,15 @@ model ProjectMember {
 
 model Task {
   id           String    @id @default(uuid()) @db.Uuid
-  customId     String?   @map("custom_id") @db.VarChar(50)
   title        String    @db.VarChar(255)
   description  String?   @db.Text
-  requirement  String?   @map("requirement") @db.VarChar(50)
-  sprint       String?   @map("sprint") @db.VarChar(50)
-  durationDays Int?      @map("duration_days") @db.SmallInt
   priority     String    @default("MEDIUM") @db.VarChar(50)
   status       String    @default("TODO") @db.VarChar(50)
   startDate    DateTime  @map("start_date") @db.Date
   dueDate      DateTime  @map("due_date") @db.Date
   predecessors String?   @map("predecessors") @db.Text
   isEpic       Boolean   @default(false) @map("is_epic")
+  isMilestone  Boolean   @default(false) @map("is_milestone")
   parentId     String?   @map("parent_id") @db.Uuid
   projectId    String    @map("project_id") @db.Uuid
   assigneeId   String?   @map("assignee_id") @db.Uuid

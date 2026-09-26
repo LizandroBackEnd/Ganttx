@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { IconCrown } from "@tabler/icons-react";
+import { IconCrown, IconDiamond } from "@tabler/icons-react";
 import type { TaskDTO } from "@/features/tasks";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
@@ -164,15 +164,13 @@ export function GanttBar({
           {task.isEpic && (
             <IconCrown className="size-3 text-purple-300 shrink-0" />
           )}
-          {task.customId && (
-            <span className="font-mono font-semibold text-primary-light shrink-0">
-              [{task.customId}]
-            </span>
+          {task.isMilestone && (
+            <IconDiamond className="size-3 text-amber-300 shrink-0" />
           )}
           <span className="truncate">{task.title}</span>
         </div>
         <span className="font-mono text-[10px] text-text-muted ml-1 shrink-0">
-          {task.durationDays ? `${task.durationDays}d` : task.status}
+          {task.status}
         </span>
       </div>
 

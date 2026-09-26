@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { TaskCard } from "./task-card";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { BucketConfigDialog } from "./bucket-config-dialog";
-import { IconPlus, IconDots, IconSquarePlus } from "@tabler/icons-react";
+import { Button } from "@/shared/components/ui/button";
+import { IconPlus, IconDots, IconSquarePlus, IconX } from "@tabler/icons-react";
+import { createTask } from "../api/task-mutations";
+import { sileo } from "sileo";
 import { cn } from "@/lib/utils";
 import type {
   TaskDTO,
@@ -31,6 +35,13 @@ export interface TaskBucketColumnProps {
   readonly canDeleteBucket?: boolean;
 }
 
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function TaskBucketColumn({
   bucket,
   tasks,
@@ -45,9 +56,18 @@ export function TaskBucketColumn({
   onDeleteBucket,
   canDeleteBucket = false,
 }: TaskBucketColumnProps): React.JSX.Element {
+  const router = useRouter();
   const [isOver, setIsOver] = useState<boolean>(false);
-  const [isNewTaskOpen, setIsNewTaskOpen] = useState<boolean>(false);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+
+  // Inline Task Creation state
+  const [isInlineAdding, setIsInlineAdding] = useState<boolean>(false);
+  const [inlineTitle, setInlineTitle] = useState<string>("");
+  const [isSubmittingInline, setIsSubmittingInline] = useState<boolean>(false);
+
+  // Modal open after inline task creation
+  const [createdTaskForModal, setCreatedTaskForModal] = useState<TaskDTO | undefined>(undefined);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
@@ -70,7 +90,105 @@ export function TaskBucketColumn({
     }
   };
 
+  const handleInlineCreate = async (): Promise<void> => {
+    if (!inlineTitle.trim() || isSubmittingInline) return;
+    setIsSubmittingInline(true);
+
+    try {
+      const today = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+
+      const res = await createTask({
+        projectId,
+        title: inlineTitle.trim(),
+        status: bucket.id,
+        priority: "MEDIUM",
+        startDate: formatLocalDate(today),
+        dueDate: formatLocalDate(nextWeek),
+        isEpic: false,
+        isMilestone: false,
+      });
+
+      if (res.success && res.data) {
+        setInlineTitle("");
+        setIsInlineAdding(false);
+        setCreatedTaskForModal(res.data);
+        setIsDetailModalOpen(true);
+        sileo.success({
+          title: "Tarea creada",
+          description: `"${res.data.title}" se agregó al bucket ${bucket.label}.`,
+        });
+        router.refresh();
+      } else {
+        const errorMsg = !res.success ? res.error : "No se pudo crear la tarea.";
+        sileo.error({
+          title: "Error al crear tarea",
+          description: errorMsg,
+        });
+      }
+    } catch {
+      sileo.error({
+        title: "Error inesperado",
+        description: "Ocurrió un error al crear la tarea.",
+      });
+    } finally {
+      setIsSubmittingInline(false);
+    }
+  };
+
   const bucketColor = bucket.color ?? "#0ea5e9";
+
+  const renderInlineComposer = (): React.JSX.Element => (
+    <div className="flex flex-col gap-2 rounded-2xl border border-primary/40 bg-surface p-2.5 shadow-sm mt-0.5 animate-in fade-in-50 duration-150">
+      <textarea
+        rows={2}
+        value={inlineTitle}
+        onChange={(e) => setInlineTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            void handleInlineCreate();
+          } else if (e.key === "Escape") {
+            setIsInlineAdding(false);
+            setInlineTitle("");
+          }
+        }}
+        placeholder="Escribe el nombre de la tarea..."
+        autoFocus
+        disabled={isSubmittingInline}
+        className="w-full resize-none border-0 bg-transparent p-1 text-xs text-text-primary placeholder:text-text-muted focus:outline-none"
+      />
+      <div className="flex items-center justify-between gap-1.5 pt-1">
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void handleInlineCreate()}
+            disabled={!inlineTitle.trim() || isSubmittingInline}
+            className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary-hover px-2.5 font-semibold rounded-lg"
+          >
+            {isSubmittingInline ? "Creando..." : "Añadir"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsInlineAdding(false);
+              setInlineTitle("");
+            }}
+            disabled={isSubmittingInline}
+            className="size-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors"
+            title="Cancelar"
+          >
+            <IconX className="size-4" />
+          </button>
+        </div>
+        <span className="text-[10px] text-text-muted font-mono hidden sm:inline">
+          Enter ↵
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -123,21 +241,24 @@ export function TaskBucketColumn({
                 isOver && "ring-2 ring-primary/40 bg-primary/5 p-2 rounded-xl"
               )}
             >
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => setIsNewTaskOpen(true)}
-                  className="group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs text-text-muted hover:text-text-primary hover:bg-surface-elevated/70 transition-all border border-transparent hover:border-border/60 cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <IconPlus className="size-4 text-text-muted group-hover:text-text-primary transition-colors" />
-                    <span className="font-normal text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                      Añade una tarjeta
-                    </span>
-                  </div>
-                  <IconSquarePlus className="size-4 text-text-muted/60 group-hover:text-text-primary transition-colors" />
-                </button>
-              )}
+              {canEdit &&
+                (isInlineAdding ? (
+                  renderInlineComposer()
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineAdding(true)}
+                    className="group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs text-text-muted hover:text-text-primary hover:bg-surface-elevated/70 transition-all border border-transparent hover:border-border/60 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <IconPlus className="size-4 text-text-muted group-hover:text-text-primary transition-colors" />
+                      <span className="font-normal text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                        Añade una tarjeta
+                      </span>
+                    </div>
+                    <IconSquarePlus className="size-4 text-text-muted/60 group-hover:text-text-primary transition-colors" />
+                  </button>
+                ))}
             </div>
           ) : (
             <>
@@ -154,21 +275,24 @@ export function TaskBucketColumn({
                 />
               ))}
 
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => setIsNewTaskOpen(true)}
-                  className="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs text-text-muted hover:text-text-primary hover:bg-surface-elevated/70 transition-all border border-transparent hover:border-border/60 cursor-pointer mt-0.5"
-                >
-                  <div className="flex items-center gap-2">
-                    <IconPlus className="size-4 text-text-muted group-hover:text-text-primary transition-colors" />
-                    <span className="font-normal text-xs text-text-secondary group-hover:text-text-primary transition-colors">
-                      Añade una tarjeta
-                    </span>
-                  </div>
-                  <IconSquarePlus className="size-4 text-text-muted/60 group-hover:text-text-primary transition-colors" />
-                </button>
-              )}
+              {canEdit &&
+                (isInlineAdding ? (
+                  renderInlineComposer()
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineAdding(true)}
+                    className="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs text-text-muted hover:text-text-primary hover:bg-surface-elevated/70 transition-all border border-transparent hover:border-border/60 cursor-pointer mt-0.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <IconPlus className="size-4 text-text-muted group-hover:text-text-primary transition-colors" />
+                      <span className="font-normal text-xs text-text-secondary group-hover:text-text-primary transition-colors">
+                        Añade una tarjeta
+                      </span>
+                    </div>
+                    <IconSquarePlus className="size-4 text-text-muted/60 group-hover:text-text-primary transition-colors" />
+                  </button>
+                ))}
             </>
           )}
         </div>
@@ -186,17 +310,17 @@ export function TaskBucketColumn({
         />
       )}
 
-      {/* Quick Task Creation Dialog with Bucket Preselected */}
-      {isNewTaskOpen && (
+      {/* Detail Task Modal with Auto-save opened right after inline creation */}
+      {isDetailModalOpen && createdTaskForModal && (
         <TaskFormDialog
           projectId={projectId}
-          defaultStatus={bucket.id}
+          taskToEdit={createdTaskForModal}
           members={members}
           availableEpics={availableEpics}
           customStatuses={customStatuses}
           customPriorities={customPriorities}
-          isOpen={isNewTaskOpen}
-          onOpenChange={setIsNewTaskOpen}
+          isOpen={isDetailModalOpen}
+          onOpenChange={setIsDetailModalOpen}
         />
       )}
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -8,17 +8,42 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
   DialogTrigger,
 } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { DatePicker } from "@/shared/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import { cn } from "@/lib/utils";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
-import { createTask, updateTask, deleteTask } from "../api/task-mutations";
-import { IconSettings, IconCrown, IconTrash } from "@tabler/icons-react";
+import {
+  createTask,
+  updateTask,
+  getSubtasks,
+  createSubtask,
+  deleteSubtask,
+} from "../api/task-mutations";
+import {
+  IconSettings,
+  IconCrown,
+  IconDiamond,
+  IconCheck,
+  IconLoader2,
+  IconX,
+} from "@tabler/icons-react";
 import { sileo } from "sileo";
-import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
+import type {
+  TaskDTO,
+  SubtaskDTO,
+  CustomStatusOption,
+  CustomPriorityOption,
+  UpdateTaskInput,
+} from "../types/task.types";
 
 export interface ProjectMemberOption {
   readonly id: string;
@@ -29,7 +54,6 @@ export interface ProjectMemberOption {
 export interface TaskEpicOption {
   readonly id: string;
   readonly title: string;
-  readonly customId: string | null;
 }
 
 export interface TaskFormDialogProps {
@@ -46,6 +70,7 @@ export interface TaskFormDialogProps {
   readonly onOpenChangeControlled?: (open: boolean) => void;
   readonly isOpen?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
 }
 
 function formatLocalDate(d: Date): string {
@@ -65,15 +90,6 @@ function getOneWeekLaterString(): string {
   return formatLocalDate(d);
 }
 
-function calculateDuration(startStr: string, endStr: string): number {
-  if (!startStr || !endStr) return 1;
-  const start = new Date(`${startStr}T00:00:00`);
-  const end = new Date(`${endStr}T00:00:00`);
-  const diffTime = end.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  return diffDays > 0 ? diffDays : 1;
-}
-
 const fallbackStatuses: CustomStatusOption[] = [
   { id: "TODO", label: "Por Hacer" },
   { id: "IN_PROGRESS", label: "En Progreso" },
@@ -89,6 +105,653 @@ const fallbackPriorities: CustomPriorityOption[] = [
   { id: "URGENT", label: "Urgente" },
 ];
 
+interface TaskFormContentProps {
+  readonly projectId: string;
+  readonly initialTask?: TaskDTO;
+  readonly defaultStatus?: string;
+  readonly members: readonly ProjectMemberOption[];
+  readonly availableEpics: readonly TaskEpicOption[];
+  readonly priorities: readonly CustomPriorityOption[];
+  readonly onOpenConfig: () => void;
+  readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
+}
+
+function TaskFormContent({
+  projectId,
+  initialTask,
+  defaultStatus,
+  members,
+  availableEpics,
+  priorities,
+  onOpenConfig,
+  onTaskCreatedOrUpdated,
+}: TaskFormContentProps): React.JSX.Element {
+  const router = useRouter();
+  const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
+
+  // Form State initialized directly from initialTask
+  const [title, setTitle] = useState<string>(initialTask?.title ?? "");
+  const [assigneeId, setAssigneeId] = useState<string>(initialTask?.assigneeId ?? "");
+  const [startDate, setStartDate] = useState<string>(initialTask?.startDate ?? getTodayString());
+  const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? getOneWeekLaterString());
+  const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
+  const [isEpic, setIsEpic] = useState<boolean>(initialTask?.isEpic ?? false);
+  const [isMilestone, setIsMilestone] = useState<boolean>(initialTask?.isMilestone ?? false);
+  const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
+  const status = initialTask?.status ?? defaultStatus ?? "TODO";
+  const [priority, setPriority] = useState<string>(initialTask?.priority ?? "MEDIUM");
+  const [description, setDescription] = useState<string>(initialTask?.description ?? "");
+
+  // Auto-save feedback
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isCreatingRef = useRef<boolean>(false);
+
+  // Subtasks state
+  const [subtasks, setSubtasks] = useState<SubtaskDTO[]>([]);
+  const [activeTab, setActiveTab] = useState<"description" | "subtasks">("description");
+  const [isAddingSubtask, setIsAddingSubtask] = useState<boolean>(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState<string>("");
+  const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>("");
+  const [isSavingSubtask, setIsSavingSubtask] = useState<boolean>(false);
+
+  // Load subtasks when task is present
+  useEffect(() => {
+    if (!currentTask?.id) return;
+    let isCancelled = false;
+    getSubtasks(currentTask.id).then((res) => {
+      if (!isCancelled && res.success && res.data) {
+        setSubtasks(res.data);
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentTask?.id]);
+
+  const handleAddSubtask = async (): Promise<void> => {
+    if (!newSubtaskTitle.trim() || !currentTask?.id) return;
+    setIsSavingSubtask(true);
+    try {
+      const res = await createSubtask({
+        parentId: currentTask.id,
+        projectId,
+        title: newSubtaskTitle.trim(),
+        assigneeId: newSubtaskAssigneeId || null,
+      });
+      if (res.success && res.data) {
+        setSubtasks((prev) => [...prev, res.data]);
+        setNewSubtaskTitle("");
+        setNewSubtaskAssigneeId("");
+        setIsAddingSubtask(false);
+        router.refresh();
+      } else {
+        const errorMsg = !res.success ? res.error : "No se pudo crear la subtarea";
+        sileo.error({
+          title: "Error al crear subtarea",
+          description: errorMsg,
+        });
+      }
+    } catch {
+      sileo.error({
+        title: "Error al crear subtarea",
+        description: "Ocurrió un error inesperado.",
+      });
+    } finally {
+      setIsSavingSubtask(false);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string): Promise<void> => {
+    setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
+    await deleteSubtask(subtaskId, projectId);
+    router.refresh();
+  };
+
+  // Send update or create on server
+  const persistChanges = useCallback(
+    async (updates: Partial<UpdateTaskInput>): Promise<void> => {
+      const activeId = currentTask?.id;
+
+      if (!activeId) {
+        // Create initial task if not yet created
+        const candidateTitle = (updates.title ?? title).trim();
+        if (!candidateTitle || isCreatingRef.current) return;
+
+        isCreatingRef.current = true;
+        setSaveState("saving");
+
+        try {
+          const res = await createTask({
+            projectId,
+            title: candidateTitle,
+            status: (updates.status ?? status) || defaultStatus || "TODO",
+            priority: (updates.priority ?? priority) || "MEDIUM",
+            startDate: updates.startDate ?? startDate,
+            dueDate: updates.dueDate ?? dueDate,
+            isEpic: updates.isEpic ?? isEpic,
+            isMilestone: updates.isMilestone ?? isMilestone,
+            parentId: updates.parentId !== undefined ? updates.parentId : parentId || undefined,
+            assigneeId: updates.assigneeId !== undefined ? updates.assigneeId : assigneeId || undefined,
+            description: updates.description !== undefined ? updates.description : description.trim() || undefined,
+          });
+
+          if (res.success && res.data) {
+            setCurrentTask(res.data);
+            onTaskCreatedOrUpdated?.(res.data);
+            setSaveState("saved");
+            setTimeout(() => setSaveState("idle"), 1800);
+            router.refresh();
+          } else {
+            setSaveState("error");
+          }
+        } catch {
+          setSaveState("error");
+        } finally {
+          isCreatingRef.current = false;
+        }
+        return;
+      }
+
+      setSaveState("saving");
+      try {
+        const res = await updateTask({
+          taskId: activeId,
+          ...updates,
+        });
+
+        if (res.success) {
+          setSaveState("saved");
+          setTimeout(() => setSaveState("idle"), 1800);
+          router.refresh();
+        } else {
+          setSaveState("error");
+        }
+      } catch {
+        setSaveState("error");
+      }
+    },
+    [
+      currentTask?.id,
+      title,
+      projectId,
+      status,
+      defaultStatus,
+      priority,
+      startDate,
+      dueDate,
+      isEpic,
+      isMilestone,
+      parentId,
+      assigneeId,
+      description,
+      onTaskCreatedOrUpdated,
+      router,
+    ]
+  );
+
+  const queueDebouncedSave = useCallback(
+    (updates: Partial<UpdateTaskInput>): void => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      setSaveState("saving");
+      debounceTimerRef.current = setTimeout(() => {
+        void persistChanges(updates);
+      }, 450);
+    },
+    [persistChanges]
+  );
+
+  const triggerImmediateSave = useCallback(
+    (updates: Partial<UpdateTaskInput>): void => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      void persistChanges(updates);
+    },
+    [persistChanges]
+  );
+
+  return (
+    <>
+      <DialogHeader className="border-b border-border/60 pb-3">
+        <div className="flex items-center justify-between gap-3">
+          {/* Editable Title in Header */}
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="sr-only">Editar Tarea</DialogTitle>
+            <DialogDescription className="sr-only">Detalles de la tarea</DialogDescription>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTitle(next);
+                queueDebouncedSave({ title: next.trim() });
+              }}
+              onBlur={() => {
+                if (title.trim()) {
+                  triggerImmediateSave({ title: title.trim() });
+                }
+              }}
+              placeholder="Nombre de la tarea..."
+              className="w-full text-lg font-bold text-text-primary bg-transparent border-0 border-b border-transparent hover:border-border/60 focus:border-primary focus:outline-none py-0.5 px-0 transition-colors placeholder:text-text-muted"
+            />
+          </div>
+
+          {/* Auto-save Feedback Indicator */}
+          <div className="flex items-center gap-2 shrink-0">
+            {saveState === "saving" && (
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[11px] font-medium">
+                <IconLoader2 className="size-3 animate-spin" />
+                <span>Guardando...</span>
+              </div>
+            )}
+            {saveState === "saved" && (
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[11px] font-medium">
+                <IconCheck className="size-3 stroke-3" />
+                <span>Guardado</span>
+              </div>
+            )}
+            {saveState === "error" && (
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[11px] font-medium">
+                <span>Error al guardar</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogHeader>
+
+      <div className="py-4 flex flex-col gap-4">
+        {/* Tarea Maestra (EPIC) */}
+        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IconCrown className="size-4 text-purple-400" />
+              <span className="text-xs font-semibold text-text-primary">
+                Tarea Maestra (EPIC)
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isEpic}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIsEpic(next);
+                  if (next) setParentId("");
+                  triggerImmediateSave({ isEpic: next, parentId: null });
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-purple-600" />
+            </label>
+          </div>
+
+          {!isEpic && availableEpics.length > 0 && (
+            <div className="flex items-center gap-2 pt-2 border-t border-purple-500/15">
+              <span className="text-[11px] text-text-secondary shrink-0">Pertenece al EPIC:</span>
+              <Select
+                value={parentId || "NONE"}
+                onValueChange={(val) => {
+                  const next = val === "NONE" ? "" : val;
+                  setParentId(next);
+                  triggerImmediateSave({ parentId: next || null });
+                }}
+              >
+                <SelectTrigger className="h-8 w-full rounded-xl border border-border bg-background px-2.5 text-xs text-text-primary focus:border-purple-400">
+                  <SelectValue placeholder="Ninguno (Tarea independiente)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Ninguno (Tarea independiente)</SelectItem>
+                  {availableEpics
+                    .filter((ep) => !currentTask || ep.id !== currentTask.id)
+                    .map((ep) => (
+                      <SelectItem key={ep.id} value={ep.id}>
+                        {ep.title}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* Fila 1: Asignado (Izquierda) y Etiquetas (Derecha) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-text-primary">
+              Asignado
+            </label>
+            <Select
+              value={assigneeId || "UNASSIGNED"}
+              onValueChange={(val) => {
+                const next = val === "UNASSIGNED" ? "" : val;
+                setAssigneeId(next);
+                triggerImmediateSave({ assigneeId: next || null });
+              }}
+            >
+              <SelectTrigger className="h-9 w-full rounded-xl border border-border bg-background px-3 text-xs text-text-primary">
+                <SelectValue placeholder="Sin asignar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="UNASSIGNED">Sin asignar</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name ? `${m.name} (${m.email})` : m.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-text-primary">
+                Etiquetas
+              </label>
+              <button
+                type="button"
+                onClick={onOpenConfig}
+                className="flex items-center gap-1 text-[11px] text-primary hover:underline cursor-pointer"
+              >
+                <IconSettings className="size-3" />
+                <span>Personalizar</span>
+              </button>
+            </div>
+            <Select
+              value={priority}
+              onValueChange={(val) => {
+                setPriority(val);
+                triggerImmediateSave({ priority: val });
+              }}
+            >
+              <SelectTrigger className="h-9 w-full rounded-xl border border-border bg-background px-3 text-xs text-text-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map((pr) => (
+                  <SelectItem key={pr.id} value={pr.id}>
+                    {pr.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Fila 2: Fecha de inicio (Izquierda) y Fecha de fin (Derecha) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="task-start" className="text-xs font-semibold text-text-primary">
+              Fecha de inicio *
+            </label>
+            <DatePicker
+              id="task-start"
+              value={startDate}
+              onChange={(newStart) => {
+                setStartDate(newStart);
+                triggerImmediateSave({ startDate: newStart });
+              }}
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="task-due" className="text-xs font-semibold text-text-primary">
+              Fecha de fin *
+            </label>
+            <DatePicker
+              id="task-due"
+              value={dueDate}
+              onChange={(newDue) => {
+                setDueDate(newDue);
+                triggerImmediateSave({ dueDate: newDue });
+              }}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Fila 3: Predecesoras y Hito */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
+              Predecesoras
+            </label>
+            <Input
+              id="task-predecessors"
+              type="text"
+              placeholder="ej. Tarea 1..."
+              value={predecessors}
+              onChange={(e) => {
+                const next = e.target.value;
+                setPredecessors(next);
+                queueDebouncedSave({ predecessors: next.trim() || null });
+              }}
+              onBlur={() => {
+                triggerImmediateSave({ predecessors: predecessors.trim() || null });
+              }}
+              maxLength={500}
+              className="border-border bg-background text-xs rounded-xl h-9"
+            />
+          </div>
+
+          <div className="flex flex-col justify-between gap-1.5 rounded-xl border border-border/80 bg-background/50 p-2.5">
+            <div className="flex items-center gap-1.5">
+              <IconDiamond className="size-4 text-amber-500" />
+              <span className="text-xs font-semibold text-text-primary">Hito</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-text-muted">Punto clave</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMilestone}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setIsMilestone(next);
+                    triggerImmediateSave({ isMilestone: next });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-amber-500" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Fila 4: Tabs de Descripción y Subtareas */}
+        <div className="flex flex-col pt-2 border-t border-border/40">
+          {/* Tab Navigation matching image */}
+          <div className="flex items-center gap-1 border-b border-border">
+            <button
+              type="button"
+              onClick={() => setActiveTab("description")}
+              className={cn(
+                "px-4 py-2 text-xs transition-colors cursor-pointer -mb-px",
+                activeTab === "description"
+                  ? "rounded-t-lg border border-b-0 border-border bg-surface text-text-primary font-semibold"
+                  : "text-text-muted hover:text-text-primary font-medium"
+              )}
+            >
+              Descripción
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("subtasks")}
+              className={cn(
+                "px-4 py-2 text-xs transition-colors cursor-pointer -mb-px flex items-center gap-1.5",
+                activeTab === "subtasks"
+                  ? "rounded-t-lg border border-b-0 border-border bg-surface text-text-primary font-semibold"
+                  : "text-text-muted hover:text-text-primary font-medium"
+              )}
+            >
+              <span>Subtareas</span>
+              {subtasks.length > 0 && (
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                  {subtasks.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Tab 1: Descripción */}
+          {activeTab === "description" && (
+            <div className="pt-3">
+              <textarea
+                id="task-description"
+                rows={4}
+                placeholder="Agrega una descripción detallada o notas..."
+                value={description}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDescription(next);
+                  queueDebouncedSave({ description: next.trim() || null });
+                }}
+                onBlur={() => {
+                  triggerImmediateSave({ description: description.trim() || null });
+                }}
+                maxLength={2000}
+                className="w-full rounded-xl border border-border bg-background p-3 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Tab 2: Subtareas (matching attached image) */}
+          {activeTab === "subtasks" && (
+            <div className="flex flex-col pt-1">
+              {/* Header de columnas */}
+              <div className="grid grid-cols-12 px-3 py-2 text-xs font-semibold text-text-primary border-b border-border/60">
+                <div className="col-span-7 sm:col-span-8">Título</div>
+                <div className="col-span-5 sm:col-span-4">Personas asignadas</div>
+              </div>
+
+              {/* Lista de subtareas existentes */}
+              <div className="flex flex-col divide-y divide-border/40">
+                {subtasks.map((st) => (
+                  <div
+                    key={st.id}
+                    className="grid grid-cols-12 items-center px-3 py-2 text-xs hover:bg-surface-elevated/40 transition-colors group"
+                  >
+                    <div className="col-span-7 sm:col-span-8 flex items-center gap-2 truncate pr-2">
+                      <span className="text-text-primary truncate">{st.title}</span>
+                    </div>
+                    <div className="col-span-5 sm:col-span-4 flex items-center justify-between">
+                      <span className="text-text-secondary truncate text-[11px]">
+                        {st.assignee?.name || st.assignee?.email || "Sin asignar"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSubtask(st.id)}
+                        className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger p-1 rounded transition-opacity cursor-pointer"
+                        title="Eliminar subtarea"
+                      >
+                        <IconX className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Inline Add Row */}
+                {isAddingSubtask ? (
+                  <div className="grid grid-cols-12 items-center gap-2 px-3 py-2 bg-surface-elevated/20">
+                    <div className="col-span-7 sm:col-span-8">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Título de la subtarea..."
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleAddSubtask();
+                          } else if (e.key === "Escape") {
+                            setIsAddingSubtask(false);
+                            setNewSubtaskTitle("");
+                          }
+                        }}
+                        className="w-full text-xs bg-background border border-primary/50 rounded-lg px-2.5 py-1 text-text-primary focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-5 sm:col-span-4 flex items-center gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <Select
+                          value={newSubtaskAssigneeId || "UNASSIGNED"}
+                          onValueChange={(val) => {
+                            setNewSubtaskAssigneeId(val === "UNASSIGNED" ? "" : val);
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-text-primary">
+                            <SelectValue placeholder="Sin asignar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="UNASSIGNED">Sin asignar</SelectItem>
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.name || m.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleAddSubtask()}
+                        disabled={isSavingSubtask || !newSubtaskTitle.trim()}
+                        className="p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                        title="Guardar"
+                      >
+                        <IconCheck className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingSubtask(false);
+                          setNewSubtaskTitle("");
+                        }}
+                        className="p-1 rounded text-text-muted hover:text-text-primary cursor-pointer"
+                        title="Cancelar"
+                      >
+                        <IconX className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Botón "Agregar una línea" exactamente como la imagen */
+                  <div className="px-3 py-2 border-b border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!currentTask?.id) {
+                          sileo.info({
+                            title: "Primero escribe un título",
+                            description: "Ingresa el nombre de la tarea para poder añadirle subtareas.",
+                          });
+                          return;
+                        }
+                        setIsAddingSubtask(true);
+                      }}
+                      className="text-xs text-sky-500 hover:text-sky-400 font-normal cursor-pointer flex items-center gap-1 transition-colors"
+                    >
+                      <span>Agregar una subtarea</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Líneas vacías de división estilo cuadrícula como en la imagen */}
+                <div className="h-7 border-b border-border/30" />
+                <div className="h-7 border-b border-border/30" />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function TaskFormDialog({
   projectId,
   members = [],
@@ -103,9 +766,9 @@ export function TaskFormDialog({
   onOpenChangeControlled,
   isOpen: isOpenAlias,
   onOpenChange: onOpenChangeAlias,
+  onTaskCreatedOrUpdated,
 }: TaskFormDialogProps): React.JSX.Element {
-  const activeTask = taskAlias ?? taskToEdit;
-  const router = useRouter();
+  const initialTask = taskAlias ?? taskToEdit;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
   const effectiveIsOpen = isOpenAlias !== undefined ? isOpenAlias : isOpenControlled;
   const effectiveOnOpenChange = onOpenChangeAlias !== undefined ? onOpenChangeAlias : onOpenChangeControlled;
@@ -123,542 +786,24 @@ export function TaskFormDialog({
   );
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
 
-  // 1. ID / Clave
-  const [customId, setCustomId] = useState<string>(activeTask?.customId ?? "");
-  // 2. Actividad / Título
-  const [title, setTitle] = useState<string>(activeTask?.title ?? "");
-  // 3. Requerimiento
-  const [requirement, setRequirement] = useState<string>(activeTask?.requirement ?? "");
-  // 4. Sprint
-  const [sprint, setSprint] = useState<string>(activeTask?.sprint ?? "");
-  // 5. Asignado
-  const [assigneeId, setAssigneeId] = useState<string>(activeTask?.assigneeId ?? "");
-  // 6, 7, 8. Fechas & Duración
-  const [startDate, setStartDate] = useState<string>(activeTask?.startDate ?? getTodayString());
-  const [dueDate, setDueDate] = useState<string>(activeTask?.dueDate ?? getOneWeekLaterString());
-  const [durationDays, setDurationDays] = useState<number>(
-    activeTask?.durationDays ?? calculateDuration(activeTask?.startDate ?? getTodayString(), activeTask?.dueDate ?? getOneWeekLaterString())
-  );
-  // 9. Predecesoras
-  const [predecessors, setPredecessors] = useState<string>(activeTask?.predecessors ?? "");
-  // EPICs
-  const [isEpic, setIsEpic] = useState<boolean>(activeTask?.isEpic ?? false);
-  const [parentId, setParentId] = useState<string>(activeTask?.parentId ?? "");
-  // Status & Priority
-  const [status, setStatus] = useState<string>(activeTask?.status ?? defaultStatus ?? "TODO");
-  const [priority, setPriority] = useState<string>(activeTask?.priority ?? "MEDIUM");
-  const [description, setDescription] = useState<string>(activeTask?.description ?? "");
-
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleDeleteTask = async (): Promise<void> => {
-    if (!activeTask) return;
-
-    try {
-      setIsDeleting(true);
-      const res = await deleteTask({ taskId: activeTask.id });
-      if (!res.success) {
-        sileo.error({
-          title: "Error al eliminar tarea",
-          description: res.error,
-        });
-        setIsDeleting(false);
-        return;
-      }
-      sileo.success({
-        title: "Tarea eliminada",
-        description: `"${activeTask.title}" fue eliminada correctamente.`,
-      });
-      setOpen(false);
-      router.refresh();
-    } catch {
-      sileo.error({
-        title: "Error al eliminar tarea",
-        description: "Ocurrió un error inesperado al eliminar la tarea.",
-      });
-      setIsDeleting(false);
-    }
-  };
-
-  // Auto-recalculate duration when dates change
-  const handleStartDateChange = (newStart: string): void => {
-    setStartDate(newStart);
-    setDurationDays(calculateDuration(newStart, dueDate));
-  };
-
-  const handleDueDateChange = (newDue: string): void => {
-    setDueDate(newDue);
-    setDurationDays(calculateDuration(startDate, newDue));
-  };
-
-  const handleDurationChange = (days: number): void => {
-    setDurationDays(days);
-    if (startDate && days > 0) {
-      const d = new Date(`${startDate}T00:00:00`);
-      d.setDate(d.getDate() + (days - 1));
-      setDueDate(formatLocalDate(d));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setError("La actividad o nombre de la tarea es obligatorio");
-      return;
-    }
-    if (dueDate < startDate) {
-      setError("La fecha de fin no puede ser anterior a la de inicio");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      if (activeTask) {
-        const res = await updateTask({
-          taskId: activeTask.id,
-          customId: customId.trim() || null,
-          title: title.trim(),
-          description: description.trim() || null,
-          requirement: requirement.trim() || null,
-          sprint: sprint.trim() || null,
-          durationDays,
-          priority,
-          status,
-          startDate,
-          dueDate,
-          predecessors: predecessors.trim() || null,
-          isEpic,
-          parentId: isEpic ? null : parentId || null,
-          assigneeId: assigneeId || null,
-        });
-
-        if (!res.success) {
-          setError(res.error);
-          sileo.error({
-            title: "Error al actualizar tarea",
-            description: res.error,
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        sileo.success({
-          title: "Tarea actualizada",
-          description: `"${title.trim()}" se guardó correctamente.`,
-        });
-      } else {
-        const res = await createTask({
-          projectId,
-          customId: customId.trim() || undefined,
-          title: title.trim(),
-          description: description.trim() || undefined,
-          requirement: requirement.trim() || undefined,
-          sprint: sprint.trim() || undefined,
-          durationDays,
-          priority,
-          status,
-          startDate,
-          dueDate,
-          predecessors: predecessors.trim() || undefined,
-          isEpic,
-          parentId: isEpic ? undefined : parentId || undefined,
-          assigneeId: assigneeId || undefined,
-        });
-
-        if (!res.success) {
-          setError(res.error);
-          sileo.error({
-            title: "Error al crear tarea",
-            description: res.error,
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        sileo.success({
-          title: "Tarea creada",
-          description: `"${title.trim()}" se agregó al proyecto.`,
-        });
-      }
-
-      setOpen(false);
-      if (!activeTask) {
-        setCustomId("");
-        setTitle("");
-        setRequirement("");
-        setSprint("");
-        setDescription("");
-        setPredecessors("");
-        setIsEpic(false);
-        setParentId("");
-      }
-      router.refresh();
-    } catch {
-      const msg = "Ocurrió un error inesperado al guardar la tarea";
-      setError(msg);
-      sileo.error({
-        title: "Error al guardar tarea",
-        description: msg,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setOpen}>
         {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-        <DialogContent className="border-border bg-surface sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <DialogTitle className="text-xl font-bold text-text-primary">
-                    {taskToEdit ? "Editar Tarea" : "Crear Nueva Tarea"}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs text-text-secondary mt-0.5">
-                    {taskToEdit
-                      ? "Actualiza las propiedades, fechas y dependencias de la tarea."
-                      : "Registra una nueva actividad en el cronograma de trabajo."}
-                  </DialogDescription>
-                </div>
-
-                {/* Epic indicator */}
-                {isEpic && (
-                  <div className="flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400">
-                    <IconCrown className="size-3.5" />
-                    <span>Tarea EPIC</span>
-                  </div>
-                )}
-              </div>
-            </DialogHeader>
-
-            <div className="my-5 flex flex-col gap-4">
-              {error && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                  {error}
-                </div>
-              )}
-
-              {/* 1. ID & 2. Actividad */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="flex flex-col gap-1.5 sm:col-span-1">
-                  <label htmlFor="task-custom-id" className="text-xs font-semibold text-text-primary">
-                    1. ID
-                  </label>
-                  <Input
-                    id="task-custom-id"
-                    type="text"
-                    placeholder="ej. T1.1, CU01"
-                    value={customId}
-                    onChange={(e) => setCustomId(e.target.value)}
-                    disabled={isLoading}
-                    maxLength={50}
-                    className="border-border bg-background text-xs font-mono"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5 sm:col-span-3">
-                  <label htmlFor="task-title" className="text-xs font-semibold text-text-primary">
-                    2. Actividad *
-                  </label>
-                  <Input
-                    id="task-title"
-                    type="text"
-                    placeholder="ej. Configuración del entorno, Especificar CU"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    disabled={isLoading}
-                    required
-                    maxLength={255}
-                    className="border-border bg-background text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Requerimiento & 4. Sprint */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="task-req" className="text-xs font-semibold text-text-primary">
-                    3. Requerimiento
-                  </label>
-                  <Input
-                    id="task-req"
-                    type="text"
-                    placeholder="ej. RF01, RNF02, RF04"
-                    value={requirement}
-                    onChange={(e) => setRequirement(e.target.value)}
-                    disabled={isLoading}
-                    maxLength={50}
-                    className="border-border bg-background text-xs font-mono"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="task-sprint" className="text-xs font-semibold text-text-primary">
-                    4. Sprint
-                  </label>
-                  <Input
-                    id="task-sprint"
-                    type="text"
-                    placeholder="ej. 1, 2, 3 o Sprint 1"
-                    value={sprint}
-                    onChange={(e) => setSprint(e.target.value)}
-                    disabled={isLoading}
-                    maxLength={50}
-                    className="border-border bg-background text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* 5. Asignado */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-assignee" className="text-xs font-semibold text-text-primary">
-                  5. Asignado
-                </label>
-                <select
-                  id="task-assignee"
-                  value={assigneeId}
-                  onChange={(e) => setAssigneeId(e.target.value)}
-                  disabled={isLoading}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
-                >
-                  <option value="">Sin asignar / Todo el equipo</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name ? `${m.name} (${m.email})` : m.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 6. Duración, 7. Inicio, 8. Fin */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="task-start" className="text-xs font-semibold text-text-primary">
-                    7. Inicio *
-                  </label>
-                  <DatePicker
-                    id="task-start"
-                    value={startDate}
-                    onChange={handleStartDateChange}
-                    disabled={isLoading}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="task-due" className="text-xs font-semibold text-text-primary">
-                    8. Fin *
-                  </label>
-                  <DatePicker
-                    id="task-due"
-                    value={dueDate}
-                    onChange={handleDueDateChange}
-                    disabled={isLoading}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="task-duration" className="text-xs font-semibold text-text-primary">
-                    6. Duración (días)
-                  </label>
-                  <Input
-                    id="task-duration"
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={durationDays}
-                    onChange={(e) => handleDurationChange(Math.max(1, Number(e.target.value) || 1))}
-                    disabled={isLoading}
-                    className="border-border bg-background text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* 9. Predecesoras */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
-                  9. Predecesoras
-                </label>
-                <Input
-                  id="task-predecessors"
-                  type="text"
-                  placeholder="ej. T1.1, T1.3, CU01"
-                  value={predecessors}
-                  onChange={(e) => setPredecessors(e.target.value)}
-                  disabled={isLoading}
-                  maxLength={500}
-                  className="border-border bg-background text-xs font-mono"
-                />
-              </div>
-
-              {/* EPIC / Jerarquía Maestra */}
-              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <IconCrown className="size-4 text-purple-400" />
-                    <span className="text-xs font-semibold text-text-primary">
-                      Tarea Maestra (EPIC)
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isEpic}
-                      onChange={(e) => setIsEpic(e.target.checked)}
-                      disabled={isLoading}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
-                  </label>
-                </div>
-
-                {!isEpic && availableEpics.length > 0 && (
-                  <div className="flex flex-col gap-1.5 pt-2 border-t border-purple-500/20">
-                    <label htmlFor="task-epic-parent" className="text-xs font-medium text-text-secondary">
-                      Pertenece al EPIC:
-                    </label>
-                    <select
-                      id="task-epic-parent"
-                      value={parentId}
-                      onChange={(e) => setParentId(e.target.value)}
-                      disabled={isLoading}
-                      className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
-                    >
-                      <option value="">Ninguno (Tarea independiente)</option>
-                      {availableEpics
-                        .filter((ep) => !taskToEdit || ep.id !== taskToEdit.id)
-                        .map((ep) => (
-                          <option key={ep.id} value={ep.id}>
-                            {ep.customId ? `[${ep.customId}] ` : ""}{ep.title}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Estado y Prioridad con Botón de Ajustes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="task-status" className="text-xs font-semibold text-text-primary">
-                      Estado
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsConfigOpen(true)}
-                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-                    >
-                      <IconSettings className="size-3" />
-                      <span>Personalizar</span>
-                    </button>
-                  </div>
-                  <select
-                    id="task-status"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    disabled={isLoading}
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
-                  >
-                    {statuses.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {st.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="task-priority" className="text-xs font-semibold text-text-primary">
-                      Prioridad
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsConfigOpen(true)}
-                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-                    >
-                      <IconSettings className="size-3" />
-                      <span>Personalizar</span>
-                    </button>
-                  </div>
-                  <select
-                    id="task-priority"
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    disabled={isLoading}
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-text-primary focus:border-primary focus:outline-none"
-                  >
-                    {priorities.map((pr) => (
-                      <option key={pr.id} value={pr.id}>
-                        {pr.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Descripción opcional */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="task-description" className="text-xs font-semibold text-text-primary">
-                  Descripción / Criterios de Aceptación (opcional)
-                </label>
-                <textarea
-                  id="task-description"
-                  rows={2}
-                  placeholder="Detalles adicionales, checklist o notas..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  disabled={isLoading}
-                  maxLength={2000}
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="flex flex-row items-center justify-between gap-2 border-t border-border/40 pt-4">
-              <div>
-                {activeTask && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDeleteTask}
-                    disabled={isLoading || isDeleting}
-                    className="gap-1.5"
-                  >
-                    <IconTrash className="size-4" />
-                    <span>{isDeleting ? "Eliminando..." : "Eliminar Tarea"}</span>
-                  </Button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setOpen(false)}
-                  disabled={isLoading || isDeleting}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  variant="default"
-                  disabled={isLoading || isDeleting}
-                  className="bg-primary text-primary-foreground hover:bg-primary-hover font-semibold"
-                >
-                  {isLoading ? "Guardando..." : activeTask ? "Actualizar Tarea" : "Crear Tarea"}
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
+        <DialogContent className="border-border bg-surface sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+          {isOpen && (
+            <TaskFormContent
+              key={initialTask?.id ?? "new-task"}
+              projectId={projectId}
+              initialTask={initialTask}
+              defaultStatus={defaultStatus}
+              members={members}
+              availableEpics={availableEpics}
+              priorities={priorities}
+              onOpenConfig={() => setIsConfigOpen(true)}
+              onTaskCreatedOrUpdated={onTaskCreatedOrUpdated}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

@@ -11,6 +11,7 @@ import {
   updateTaskStatusSchema,
   deleteTaskSchema,
   type TaskActionResult,
+  type TaskDTO,
   type CreateTaskInput,
   type UpdateTaskInput,
   type UpdateTaskDatesInput,
@@ -18,6 +19,7 @@ import {
   type DeleteTaskInput,
   type CustomStatusOption,
   type CustomPriorityOption,
+  type SubtaskDTO,
 } from "../types/task.types";
 
 function parseDateStringToUtcDate(dateString: string): Date {
@@ -26,7 +28,7 @@ function parseDateStringToUtcDate(dateString: string): Date {
 
 export async function createTask(
   input: CreateTaskInput
-): Promise<TaskActionResult<{ id: string }>> {
+): Promise<TaskActionResult<TaskDTO>> {
   const parsed = createTaskSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -44,18 +46,15 @@ export async function createTask(
   const creatorId = session.user.id;
   const {
     projectId,
-    customId,
     title,
     description,
-    requirement,
-    sprint,
-    durationDays,
     priority,
     status,
     startDate,
     dueDate,
     predecessors,
     isEpic,
+    isMilestone,
     parentId,
     assigneeId,
   } = parsed.data;
@@ -75,29 +74,85 @@ export async function createTask(
   try {
     const task = await prisma.task.create({
       data: {
-        customId: customId ?? null,
         title,
         description: description ?? null,
-        requirement: requirement ?? null,
-        sprint: sprint ?? null,
-        durationDays: durationDays ?? null,
         priority,
         status,
         startDate: parseDateStringToUtcDate(startDate),
         dueDate: parseDateStringToUtcDate(dueDate),
         predecessors: predecessors ?? null,
         isEpic: Boolean(isEpic),
+        isMilestone: Boolean(isMilestone),
         parentId: parentId ?? null,
         projectId,
         creatorId,
         assigneeId: assigneeId ?? null,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        priority: true,
+        status: true,
+        startDate: true,
+        dueDate: true,
+        predecessors: true,
+        isEpic: true,
+        isMilestone: true,
+        parentId: true,
+        projectId: true,
+        assigneeId: true,
+        creatorId: true,
+        createdAt: true,
+        updatedAt: true,
+        parent: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
     });
+
+    const formatLocalDateToIso = (d: Date): string => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const taskDto: TaskDTO = {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+      startDate: formatLocalDateToIso(task.startDate),
+      dueDate: formatLocalDateToIso(task.dueDate),
+      predecessors: task.predecessors,
+      isEpic: task.isEpic,
+      isMilestone: task.isMilestone,
+      parentId: task.parentId,
+      parent: task.parent,
+      projectId: task.projectId,
+      assigneeId: task.assigneeId,
+      creatorId: task.creatorId,
+      assignee: task.assignee,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+    };
 
     projectEvents.emit(projectId, "task:created", { taskId: task.id, title }, creatorId);
     revalidatePath(`/projects/${projectId}`);
-    return { success: true, data: { id: task.id } };
+    return { success: true, data: taskDto };
   } catch {
     return { success: false, error: "Error al crear la tarea" };
   }
@@ -146,12 +201,8 @@ export async function updateTask(
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        ...(fields.customId !== undefined ? { customId: fields.customId } : {}),
         ...(fields.title !== undefined ? { title: fields.title } : {}),
         ...(fields.description !== undefined ? { description: fields.description } : {}),
-        ...(fields.requirement !== undefined ? { requirement: fields.requirement } : {}),
-        ...(fields.sprint !== undefined ? { sprint: fields.sprint } : {}),
-        ...(fields.durationDays !== undefined ? { durationDays: fields.durationDays } : {}),
         ...(fields.priority !== undefined ? { priority: fields.priority } : {}),
         ...(fields.status !== undefined ? { status: fields.status } : {}),
         ...(fields.startDate !== undefined
@@ -162,6 +213,7 @@ export async function updateTask(
           : {}),
         ...(fields.predecessors !== undefined ? { predecessors: fields.predecessors } : {}),
         ...(fields.isEpic !== undefined ? { isEpic: fields.isEpic } : {}),
+        ...(fields.isMilestone !== undefined ? { isMilestone: fields.isMilestone } : {}),
         ...(fields.parentId !== undefined ? { parentId: fields.parentId } : {}),
         ...(fields.assigneeId !== undefined ? { assigneeId: fields.assigneeId } : {}),
       },
@@ -391,5 +443,140 @@ export async function updateProjectCustomOptions(
     return { success: true, data: undefined };
   } catch {
     return { success: false, error: "Error al guardar la configuración de estados y prioridades" };
+  }
+}
+
+export async function getSubtasks(
+  taskId: string
+): Promise<TaskActionResult<SubtaskDTO[]>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  try {
+    const subtasks = await prisma.task.findMany({
+      where: { parentId: taskId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        assigneeId: true,
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      success: true,
+      data: subtasks.map((s) => ({
+        id: s.id,
+        title: s.title,
+        status: s.status,
+        assigneeId: s.assigneeId,
+        assignee: s.assignee,
+      })),
+    };
+  } catch {
+    return { success: false, error: "Error al cargar subtareas" };
+  }
+}
+
+export async function createSubtask(input: {
+  parentId: string;
+  projectId: string;
+  title: string;
+  assigneeId?: string | null;
+}): Promise<TaskActionResult<SubtaskDTO>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const title = input.title.trim();
+  if (!title) {
+    return { success: false, error: "El título es requerido" };
+  }
+
+  try {
+    const parent = await prisma.task.findUnique({
+      where: { id: input.parentId },
+      select: { startDate: true, dueDate: true },
+    });
+
+    const now = new Date();
+    const startDate = parent?.startDate ?? now;
+    const dueDate = parent?.dueDate ?? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const subtask = await prisma.task.create({
+      data: {
+        projectId: input.projectId,
+        creatorId: session.user.id,
+        parentId: input.parentId,
+        title,
+        status: "TODO",
+        priority: "MEDIUM",
+        startDate,
+        dueDate,
+        assigneeId: input.assigneeId || null,
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        assigneeId: true,
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    revalidatePath(`/projects/${input.projectId}`);
+
+    return {
+      success: true,
+      data: {
+        id: subtask.id,
+        title: subtask.title,
+        status: subtask.status,
+        assigneeId: subtask.assigneeId,
+        assignee: subtask.assignee,
+      },
+    };
+  } catch {
+    return { success: false, error: "Error al crear la subtarea" };
+  }
+}
+
+export async function deleteSubtask(
+  subtaskId: string,
+  projectId: string
+): Promise<TaskActionResult<void>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  try {
+    await prisma.task.delete({
+      where: { id: subtaskId },
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+    return { success: true, data: undefined };
+  } catch {
+    return { success: false, error: "Error al eliminar la subtarea" };
   }
 }

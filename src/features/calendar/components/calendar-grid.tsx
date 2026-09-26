@@ -203,11 +203,10 @@ export function CalendarGrid({
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  {t.customId && (
-                    <span className="font-mono text-primary font-semibold">{t.customId}</span>
-                  )}
-                  {t.durationDays && (
-                    <span className="font-mono text-text-muted text-[11px]">{t.durationDays}d</span>
+                  {t.isMilestone && (
+                    <span className="flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-amber-300 border border-amber-500/20">
+                      Hito
+                    </span>
                   )}
                   <span className="rounded bg-surface px-2 py-0.5 font-mono text-[10px] text-text-secondary">
                     {t.status}

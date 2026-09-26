@@ -13,6 +13,7 @@ import {
   IconUser,
   IconFolder,
   IconTrash,
+  IconDiamond,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { deleteTask } from "../api/task-mutations";
@@ -106,23 +107,12 @@ export function TaskCard({
           task.isEpic && "border-l-4 border-l-purple-500 bg-purple-500/3"
         )}
       >
-        {/* Header: Title / CustomId & Action */}
+        {/* Header: Title & Actions */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col gap-0.5 min-w-0">
-            {task.customId ? (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-mono text-[11px] font-bold text-primary shrink-0">
-                  {task.customId}
-                </span>
-                <span className="text-xs font-semibold text-text-primary leading-snug line-clamp-2">
-                  {task.title}
-                </span>
-              </div>
-            ) : (
-              <span className="text-xs font-semibold text-text-primary leading-snug line-clamp-2">
-                {task.title}
-              </span>
-            )}
+            <span className="text-xs font-semibold text-text-primary leading-snug line-clamp-2">
+              {task.title}
+            </span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -163,6 +153,13 @@ export function TaskCard({
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           <TaskPriorityBadge priority={task.priority} />
 
+          {task.isMilestone && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/30">
+              <IconDiamond className="size-3" />
+              Hito
+            </span>
+          )}
+
           {task.isEpic && (
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/30">
               <IconCrown className="size-3" />
@@ -174,18 +171,6 @@ export function TaskCard({
             <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border truncate max-w-32.5">
               <IconFolder className="size-3 shrink-0" />
               <span className="truncate">{task.parent.title}</span>
-            </span>
-          )}
-
-          {task.sprint && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-surface-elevated text-text-secondary border border-border">
-              {task.sprint}
-            </span>
-          )}
-
-          {task.requirement && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-surface-elevated text-text-secondary border border-border">
-              {task.requirement}
             </span>
           )}
         </div>

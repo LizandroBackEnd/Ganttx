@@ -22,23 +22,19 @@ export interface CustomPriorityOption {
 export interface TaskParentDTO {
   readonly id: string;
   readonly title: string;
-  readonly customId: string | null;
 }
 
 export interface TaskDTO {
   readonly id: string;
-  readonly customId: string | null;
-  readonly title: string; // Actividad
+  readonly title: string; // Nombre de la tarea
   readonly description: string | null;
-  readonly requirement: string | null;
-  readonly sprint: string | null;
-  readonly durationDays: number | null;
   readonly priority: string;
   readonly status: string;
   readonly startDate: string;
   readonly dueDate: string;
   readonly predecessors: string | null;
   readonly isEpic: boolean;
+  readonly isMilestone: boolean;
   readonly parentId: string | null;
   readonly parent?: TaskParentDTO | null;
   readonly subtasksCount?: number;
@@ -48,6 +44,14 @@ export interface TaskDTO {
   readonly assignee: TaskAssigneeDTO | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export interface SubtaskDTO {
+  readonly id: string;
+  readonly title: string;
+  readonly status: string;
+  readonly assigneeId: string | null;
+  readonly assignee: TaskAssigneeDTO | null;
 }
 
 export type ActionSuccess<T = void> = {
@@ -68,18 +72,15 @@ const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 export const createTaskSchema = z
   .object({
     projectId: z.string().uuid("ID de proyecto inválido"),
-    customId: z.string().trim().max(50).optional().nullable(),
-    title: z.string().trim().min(1, "La actividad es obligatoria").max(255),
+    title: z.string().trim().min(1, "El nombre de la tarea es obligatorio").max(255),
     description: z.string().trim().max(2000).optional().nullable(),
-    requirement: z.string().trim().max(50).optional().nullable(),
-    sprint: z.string().trim().max(50).optional().nullable(),
-    durationDays: z.number().int().min(0).optional().nullable(),
     priority: z.string().trim().min(1).max(50).default("MEDIUM"),
     status: z.string().trim().min(1).max(50).default("TODO"),
     startDate: z.string().regex(dateRegex, "Formato de fecha de inicio inválido"),
     dueDate: z.string().regex(dateRegex, "Formato de fecha de fin inválido"),
     predecessors: z.string().trim().max(500).optional().nullable(),
     isEpic: z.boolean().default(false),
+    isMilestone: z.boolean().default(false),
     parentId: z.string().uuid("ID de tarea padre inválido").optional().nullable(),
     assigneeId: z.string().uuid("ID de asignado inválido").optional().nullable(),
   })
@@ -92,18 +93,15 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 
 export const updateTaskSchema = z.object({
   taskId: z.string().uuid("ID de tarea inválido"),
-  customId: z.string().trim().max(50).optional().nullable(),
   title: z.string().trim().min(1).max(255).optional(),
   description: z.string().trim().max(2000).optional().nullable(),
-  requirement: z.string().trim().max(50).optional().nullable(),
-  sprint: z.string().trim().max(50).optional().nullable(),
-  durationDays: z.number().int().min(0).optional().nullable(),
   priority: z.string().trim().max(50).optional(),
   status: z.string().trim().max(50).optional(),
   startDate: z.string().regex(dateRegex).optional(),
   dueDate: z.string().regex(dateRegex).optional(),
   predecessors: z.string().trim().max(500).optional().nullable(),
   isEpic: z.boolean().optional(),
+  isMilestone: z.boolean().optional(),
   parentId: z.string().uuid().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
 });

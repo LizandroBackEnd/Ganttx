@@ -13,7 +13,7 @@ import {
   type CustomPriorityOption,
 } from "@/features/tasks";
 import { Button } from "@/shared/components/ui/button";
-import { IconPlus, IconTimeline, IconCrown } from "@tabler/icons-react";
+import { IconPlus, IconTimeline, IconCrown, IconDiamond } from "@tabler/icons-react";
 import type { GanttDayColumn } from "../types/gantt.types";
 
 export interface GanttChartProps {
@@ -162,18 +162,13 @@ export function GanttChart({
                   {task.isEpic && (
                     <IconCrown className="size-3.5 text-purple-400 shrink-0" />
                   )}
-                  {task.customId && (
-                    <span className="font-mono text-[10px] text-primary font-semibold shrink-0">
-                      {task.customId}
-                    </span>
+                  {task.isMilestone && (
+                    <IconDiamond className="size-3.5 text-amber-400 shrink-0" />
                   )}
                   <span className="truncate text-xs font-medium text-text-primary">
                     {task.title}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-text-muted shrink-0">
-                  {task.durationDays ? `${task.durationDays}d` : task.sprint ? `S${task.sprint}` : ""}
-                </span>
               </button>
             ))}
           </div>
