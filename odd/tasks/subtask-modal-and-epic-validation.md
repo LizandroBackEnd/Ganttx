@@ -5,7 +5,8 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 1. Inline addition of subtasks: allow adding via typing + Enter, remove the X (cancel) button.
 2. Replace action buttons in the add row with a representative icon (`IconExternalLink`) to open the subtask details in a full task modal.
 3. Enable opening existing subtasks in the full task modal via the representative icon and clickable title.
-4. Add validation and disabled UI state preventing subtasks from being marked as EPIC, showing parent info and feedback.
+4. In subtask modal, completely remove the EPIC section and only display which parent task it belongs to.
+5. Ensure all other task actions, buttons, and fields work identically to a normal task.
 
 ## Constraints & Requirements
 - Screaming Architecture compliance (`src/features/tasks/`).
@@ -19,6 +20,7 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 - [x] TASK-3: Subtask modal integration (open existing subtasks and new subtasks in `TaskFormDialog`, refresh on close/update).
 - [x] TASK-4: Subtask EPIC option disabling and parent info UI in `TaskFormDialog`.
 - [x] TASK-5: Verification with `bun run lint` and `bun run build`.
+- [x] TASK-6: Completely remove EPIC section in subtask modal, displaying only the parent task reference.
 
 ## Verification Evidence
 - `bun run lint` (ESLint) completed with 0 errors and 0 warnings.
@@ -28,4 +30,5 @@ Enhance subtask management in the task modal (`TaskFormDialog`):
 - `getTaskDetails` server action allows retrieving complete `TaskDTO` for any subtask.
 - Subtask inline add row accepts title + Enter to create, removed the cancel X, and replaced Check/X with `IconExternalLink`.
 - Existing subtasks list rows allow clicking the title or the `IconExternalLink` action button to open the subtask in `TaskFormDialog`.
-- When subtask modal is open (`isSubtask={true}`), the EPIC toggle switch is disabled, displays a helper badge, and shows the parent task it belongs to.
+- In subtask modal (`isSubtask={true}`), the EPIC section is completely removed and replaced with a clean card showing "Pertenece a la tarea: [Parent Title]" and "Subtarea" badge.
+- All other buttons (Dates, Assignee, Priority/Label, Personalizar, Tabs, Comments) function identically to a normal task.

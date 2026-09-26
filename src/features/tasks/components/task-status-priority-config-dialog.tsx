@@ -169,7 +169,7 @@ export function TaskStatusPriorityConfigDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-surface sm:max-w-lg">
+      <DialogContent className="border-border bg-surface sm:max-w-lg z-70">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

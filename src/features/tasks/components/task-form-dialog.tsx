@@ -76,6 +76,7 @@ export interface TaskFormDialogProps {
   readonly onOpenChange?: (open: boolean) => void;
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
+  readonly parentTitle?: string;
 }
 
 function formatLocalDate(d: Date): string {
@@ -122,6 +123,7 @@ interface TaskFormContentProps {
   readonly onOpenConfig: () => void;
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
+  readonly parentTitle?: string;
 }
 
 function TaskFormContent({
@@ -136,6 +138,7 @@ function TaskFormContent({
   onOpenConfig,
   onTaskCreatedOrUpdated,
   isSubtask: isSubtaskProp,
+  parentTitle,
 }: TaskFormContentProps): React.JSX.Element {
   const router = useRouter();
   const [currentTask, setCurrentTask] = useState<TaskDTO | undefined>(initialTask);
@@ -143,7 +146,6 @@ function TaskFormContent({
   const isSubtask = Boolean(
     isSubtaskProp || initialTask?.parentId || currentTask?.parentId
   );
-  const isEpicDisabled = isSubtask;
 
   // Form State initialized directly from initialTask
   const [title, setTitle] = useState<string>(initialTask?.title ?? "");
@@ -151,7 +153,7 @@ function TaskFormContent({
   const [startDate, setStartDate] = useState<string>(initialTask?.startDate ?? getTodayString());
   const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? getOneWeekLaterString());
   const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
-  const [isEpic, setIsEpic] = useState<boolean>(isEpicDisabled ? false : (initialTask?.isEpic ?? false));
+  const [isEpic, setIsEpic] = useState<boolean>(isSubtask ? false : (initialTask?.isEpic ?? false));
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
   const bucket = initialTask?.bucket ?? defaultStatus ?? "TODO";
   const [label, setLabel] = useState<string>(initialTask?.label ?? "MEDIUM");
@@ -457,69 +459,45 @@ function TaskFormContent({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-5 flex-1">
         {/* Columna Izquierda: Formulario principal de la tarea */}
         <div className="lg:col-span-7 flex flex-col gap-4 h-full">
-          {/* Tarea Maestra (EPIC) */}
-          <div
-            className={cn(
-              "rounded-xl border p-3 flex flex-col gap-2 transition-colors",
-              isEpicDisabled
-                ? "border-border/60 bg-surface-elevated/20 opacity-90"
-                : "border-purple-500/20 bg-purple-500/5"
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <IconCrown
-                  className={cn(
-                    "size-4",
-                    isEpicDisabled ? "text-text-muted" : "text-purple-400"
-                  )}
-                />
-                <span className="text-xs font-semibold text-text-primary">
-                  Tarea Maestra (EPIC)
+          {/* Si es una subtarea, muestra únicamente a qué tarea pertenece. En caso contrario, muestra la sección de EPIC */}
+          {isSubtask ? (
+            <div className="rounded-xl border border-border/60 bg-surface-elevated/40 px-3.5 py-2.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-text-muted shrink-0">Pertenece a la tarea:</span>
+                <span className="text-xs font-semibold text-text-primary truncate">
+                  {currentTask?.parent?.title || initialTask?.parent?.title || parentTitle || "Tarea principal"}
                 </span>
-                {isEpicDisabled && (
-                  <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                    Deshabilitado para subtareas
-                  </span>
-                )}
               </div>
-              <label
-                className={cn(
-                  "relative inline-flex items-center",
-                  isEpicDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                )}
-                title={
-                  isEpicDisabled
-                    ? "Una subtarea no puede ser marcada como EPIC"
-                    : undefined
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={isEpic && !isEpicDisabled}
-                  disabled={isEpicDisabled}
-                  onChange={(e) => {
-                    if (isEpicDisabled) return;
-                    const next = e.target.checked;
-                    setIsEpic(next);
-                    if (next) setParentId("");
-                    triggerImmediateSave({ isEpic: next, parentId: null });
-                  }}
-                  className="sr-only peer"
-                />
-                <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-disabled:opacity-50" />
-              </label>
+              <span className="text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+                Subtarea
+              </span>
             </div>
-
-            {isEpicDisabled ? (
-              <div className="flex items-center gap-2 pt-2 border-t border-border/40 text-[11px] text-text-secondary">
-                <span className="shrink-0">Pertenece a la tarea:</span>
-                <span className="font-semibold text-text-primary truncate">
-                  {currentTask?.parent?.title || initialTask?.parent?.title || "Tarea principal"}
-                </span>
+          ) : (
+            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IconCrown className="size-4 text-purple-400" />
+                  <span className="text-xs font-semibold text-text-primary">
+                    Tarea Maestra (EPIC)
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isEpic}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setIsEpic(next);
+                      if (next) setParentId("");
+                      triggerImmediateSave({ isEpic: next, parentId: null });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-purple-600" />
+                </label>
               </div>
-            ) : (
-              !isEpic && availableEpics.length > 0 && (
+
+              {!isEpic && availableEpics.length > 0 && (
                 <div className="flex items-center gap-2 pt-2 border-t border-purple-500/15">
                   <span className="text-[11px] text-text-secondary shrink-0">Pertenece al EPIC:</span>
                   <Select
@@ -545,9 +523,9 @@ function TaskFormContent({
                     </SelectContent>
                   </Select>
                 </div>
-              )
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
         {/* Fila 1: Asignado (Izquierda) y Etiquetas (Derecha) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -933,6 +911,7 @@ function TaskFormContent({
         taskToEdit={subtaskModalTask}
         isOpenControlled={Boolean(subtaskModalTask)}
         isSubtask
+        parentTitle={currentTask?.title || initialTask?.title || parentTitle}
         onOpenChangeControlled={(open) => {
           if (!open) {
             setSubtaskModalTask(null);
@@ -982,6 +961,7 @@ export function TaskFormDialog({
   onOpenChange: onOpenChangeAlias,
   onTaskCreatedOrUpdated,
   isSubtask,
+  parentTitle,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
@@ -1008,7 +988,7 @@ export function TaskFormDialog({
         <DialogContent
           className={cn(
             "border-border bg-surface w-[95vw] sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl min-h-[85vh] max-h-[94vh] overflow-y-auto p-6 sm:p-8 flex flex-col",
-            isSubtask && "z-[60]"
+            isSubtask && "z-60"
           )}
         >
           {isOpen && (
@@ -1025,6 +1005,7 @@ export function TaskFormDialog({
               onOpenConfig={() => setIsConfigOpen(true)}
               onTaskCreatedOrUpdated={onTaskCreatedOrUpdated}
               isSubtask={isSubtask}
+              parentTitle={parentTitle}
             />
           )}
         </DialogContent>
