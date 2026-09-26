@@ -138,22 +138,22 @@ model ProjectMember {
 }
 
 model Task {
-  id           String    @id @default(uuid()) @db.Uuid
-  title        String    @db.VarChar(255)
-  description  String?   @db.Text
-  priority     String    @default("MEDIUM") @db.VarChar(50)
-  status       String    @default("TODO") @db.VarChar(50)
-  startDate    DateTime  @map("start_date") @db.Date
-  dueDate      DateTime  @map("due_date") @db.Date
-  predecessors String?   @map("predecessors") @db.Text
-  isEpic       Boolean   @default(false) @map("is_epic")
-  isMilestone  Boolean   @default(false) @map("is_milestone")
-  parentId     String?   @map("parent_id") @db.Uuid
-  projectId    String    @map("project_id") @db.Uuid
-  assigneeId   String?   @map("assignee_id") @db.Uuid
-  creatorId    String    @map("creator_id") @db.Uuid
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String    @id @default(uuid()) @db.Uuid
+  title              String    @db.VarChar(255)
+  description        String?   @db.Text
+  label              String    @default("MEDIUM") @db.VarChar(50)
+  bucket             String    @db.VarChar(50)
+  startDate          DateTime  @map("start_date") @db.Date
+  dueDate            DateTime  @map("due_date") @db.Date
+  predecessors       String?   @map("predecessors") @db.Text
+  isEpic             Boolean   @default(false) @map("is_epic")
+  showSubtasksOnCard Boolean   @default(false) @map("show_subtasks_on_card")
+  parentId           String?   @map("parent_id") @db.Uuid
+  projectId          String    @map("project_id") @db.Uuid
+  assigneeId         String?   @map("assignee_id") @db.Uuid
+  creatorId          String    @map("creator_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -166,7 +166,7 @@ model Task {
   @@index([assigneeId])
   @@index([creatorId])
   @@index([parentId])
-  @@index([projectId, status])
+  @@index([projectId, bucket])
   @@index([projectId, startDate])
   @@index([projectId, dueDate])
   @@map("tasks")

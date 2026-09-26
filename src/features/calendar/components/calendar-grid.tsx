@@ -31,8 +31,8 @@ function formatLocalDateToIsoString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function getTaskChipStyle(priority: string): string {
-  switch (priority) {
+function getTaskChipStyle(label: string): string {
+  switch (label) {
     case "LOW":
       return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:border-emerald-500/50";
     case "MEDIUM":
@@ -203,13 +203,8 @@ export function CalendarGrid({
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  {t.isMilestone && (
-                    <span className="flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-amber-300 border border-amber-500/20">
-                      Hito
-                    </span>
-                  )}
                   <span className="rounded bg-surface px-2 py-0.5 font-mono text-[10px] text-text-secondary">
-                    {t.status}
+                    {t.bucket}
                   </span>
                 </div>
               </button>
@@ -279,10 +274,10 @@ export function CalendarGrid({
                   key={task.id}
                   type="button"
                   onClick={() => setSelectedTask(task)}
-                  className={`rounded-md border p-2 text-left text-xs transition-all ${getTaskChipStyle(task.priority)}`}
+                  className={`rounded-md border p-2 text-left text-xs transition-all ${getTaskChipStyle(task.label)}`}
                 >
                   <p className="font-medium truncate text-text-primary">{task.title}</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">{task.status}</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">{task.bucket}</p>
                 </button>
               ))}
             </div>
@@ -437,7 +432,7 @@ export function CalendarGrid({
                   key={task.id}
                   type="button"
                   onClick={() => setSelectedTask(task)}
-                  className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium border transition-all ${getTaskChipStyle(task.priority)}`}
+                  className={`truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium border transition-all ${getTaskChipStyle(task.label)}`}
                 >
                   {task.title}
                 </button>

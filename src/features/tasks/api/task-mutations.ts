@@ -8,7 +8,7 @@ import {
   createTaskSchema,
   updateTaskSchema,
   updateTaskDatesSchema,
-  updateTaskStatusSchema,
+  updateTaskBucketSchema,
   deleteTaskSchema,
   createTaskCommentSchema,
   type TaskActionResult,
@@ -16,7 +16,7 @@ import {
   type CreateTaskInput,
   type UpdateTaskInput,
   type UpdateTaskDatesInput,
-  type UpdateTaskStatusInput,
+  type UpdateTaskBucketInput,
   type DeleteTaskInput,
   type CreateTaskCommentInput,
   type TaskCommentDTO,
@@ -51,13 +51,13 @@ export async function createTask(
     projectId,
     title,
     description,
-    priority,
-    status,
+    label,
+    bucket,
     startDate,
     dueDate,
     predecessors,
     isEpic,
-    isMilestone,
+    showSubtasksOnCard,
     parentId,
     assigneeId,
   } = parsed.data;
@@ -79,13 +79,13 @@ export async function createTask(
       data: {
         title,
         description: description ?? null,
-        priority,
-        status,
+        label,
+        bucket,
         startDate: parseDateStringToUtcDate(startDate),
         dueDate: parseDateStringToUtcDate(dueDate),
         predecessors: predecessors ?? null,
         isEpic: Boolean(isEpic),
-        isMilestone: Boolean(isMilestone),
+        showSubtasksOnCard: Boolean(showSubtasksOnCard),
         parentId: parentId ?? null,
         projectId,
         creatorId,
@@ -95,13 +95,13 @@ export async function createTask(
         id: true,
         title: true,
         description: true,
-        priority: true,
-        status: true,
+        label: true,
+        bucket: true,
         startDate: true,
         dueDate: true,
         predecessors: true,
         isEpic: true,
-        isMilestone: true,
+        showSubtasksOnCard: true,
         parentId: true,
         projectId: true,
         assigneeId: true,
@@ -136,13 +136,14 @@ export async function createTask(
       id: task.id,
       title: task.title,
       description: task.description,
-      priority: task.priority,
-      status: task.status,
+      label: task.label,
+      bucket: task.bucket,
       startDate: formatLocalDateToIso(task.startDate),
       dueDate: formatLocalDateToIso(task.dueDate),
       predecessors: task.predecessors,
       isEpic: task.isEpic,
-      isMilestone: task.isMilestone,
+      showSubtasksOnCard: task.showSubtasksOnCard,
+      subtasks: [],
       parentId: task.parentId,
       parent: task.parent,
       projectId: task.projectId,
@@ -206,8 +207,8 @@ export async function updateTask(
       data: {
         ...(fields.title !== undefined ? { title: fields.title } : {}),
         ...(fields.description !== undefined ? { description: fields.description } : {}),
-        ...(fields.priority !== undefined ? { priority: fields.priority } : {}),
-        ...(fields.status !== undefined ? { status: fields.status } : {}),
+        ...(fields.label !== undefined ? { label: fields.label } : {}),
+        ...(fields.bucket !== undefined ? { bucket: fields.bucket } : {}),
         ...(fields.startDate !== undefined
           ? { startDate: parseDateStringToUtcDate(fields.startDate) }
           : {}),
@@ -216,7 +217,9 @@ export async function updateTask(
           : {}),
         ...(fields.predecessors !== undefined ? { predecessors: fields.predecessors } : {}),
         ...(fields.isEpic !== undefined ? { isEpic: fields.isEpic } : {}),
-        ...(fields.isMilestone !== undefined ? { isMilestone: fields.isMilestone } : {}),
+        ...(fields.showSubtasksOnCard !== undefined
+          ? { showSubtasksOnCard: fields.showSubtasksOnCard }
+          : {}),
         ...(fields.parentId !== undefined ? { parentId: fields.parentId } : {}),
         ...(fields.assigneeId !== undefined ? { assigneeId: fields.assigneeId } : {}),
       },
@@ -286,10 +289,10 @@ export async function updateTaskDates(
   }
 }
 
-export async function updateTaskStatus(
-  input: UpdateTaskStatusInput
+export async function updateTaskBucket(
+  input: UpdateTaskBucketInput
 ): Promise<TaskActionResult<void>> {
-  const parsed = updateTaskStatusSchema.safeParse(input);
+  const parsed = updateTaskBucketSchema.safeParse(input);
   if (!parsed.success) {
     return {
       success: false,
@@ -304,7 +307,7 @@ export async function updateTaskStatus(
   }
 
   const userId = session.user.id;
-  const { taskId, status } = parsed.data;
+  const { taskId, bucket } = parsed.data;
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
@@ -328,16 +331,18 @@ export async function updateTaskStatus(
   try {
     await prisma.task.update({
       where: { id: taskId },
-      data: { status },
+      data: { bucket },
     });
 
-    projectEvents.emit(task.projectId, "task:updated", { taskId, status }, userId);
+    projectEvents.emit(task.projectId, "task:updated", { taskId, bucket }, userId);
     revalidatePath(`/projects/${task.projectId}`);
     return { success: true, data: undefined };
   } catch {
-    return { success: false, error: "Error al actualizar el estado de la tarea" };
+    return { success: false, error: "Error al actualizar el bucket de la tarea" };
   }
 }
+
+export const updateTaskStatus = updateTaskBucket;
 
 export async function deleteTask(
   input: DeleteTaskInput
@@ -463,7 +468,7 @@ export async function getSubtasks(
       select: {
         id: true,
         title: true,
-        status: true,
+        bucket: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -482,7 +487,7 @@ export async function getSubtasks(
       data: subtasks.map((s) => ({
         id: s.id,
         title: s.title,
-        status: s.status,
+        bucket: s.bucket,
         assigneeId: s.assigneeId,
         assignee: s.assignee,
       })),
@@ -524,8 +529,8 @@ export async function createSubtask(input: {
         creatorId: session.user.id,
         parentId: input.parentId,
         title,
-        status: "TODO",
-        priority: "MEDIUM",
+        bucket: "TODO",
+        label: "MEDIUM",
         startDate,
         dueDate,
         assigneeId: input.assigneeId || null,
@@ -533,7 +538,7 @@ export async function createSubtask(input: {
       select: {
         id: true,
         title: true,
-        status: true,
+        bucket: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -553,7 +558,7 @@ export async function createSubtask(input: {
       data: {
         id: subtask.id,
         title: subtask.title,
-        status: subtask.status,
+        bucket: subtask.bucket,
         assigneeId: subtask.assigneeId,
         assignee: subtask.assignee,
       },

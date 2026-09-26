@@ -60,7 +60,7 @@ export function TaskTable({
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      const matchesTab = activeTab === "ALL" || task.status === activeTab;
+      const matchesTab = activeTab === "ALL" || task.bucket === activeTab;
       const matchesSearch =
         !searchQuery.trim() ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -79,7 +79,7 @@ export function TaskTable({
             const count =
               tab.id === "ALL"
                 ? tasks.length
-                : tasks.filter((t) => t.status === tab.id).length;
+                : tasks.filter((t) => t.bucket === tab.id).length;
             const isActive = activeTab === tab.id;
             return (
               <button

@@ -102,12 +102,11 @@ export function TaskBucketColumn({
       const res = await createTask({
         projectId,
         title: inlineTitle.trim(),
-        status: bucket.id,
-        priority: "MEDIUM",
+        bucket: bucket.id,
+        label: "MEDIUM",
         startDate: formatLocalDate(today),
         dueDate: formatLocalDate(nextWeek),
         isEpic: false,
-        isMilestone: false,
       });
 
       if (res.success && res.data) {

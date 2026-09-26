@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
 import { TaskCommentsPanel } from "./task-comments-panel";
@@ -32,7 +33,6 @@ import {
 import {
   IconSettings,
   IconCrown,
-  IconDiamond,
   IconCheck,
   IconLoader2,
   IconX,
@@ -101,10 +101,10 @@ const fallbackStatuses: CustomStatusOption[] = [
 ];
 
 const fallbackPriorities: CustomPriorityOption[] = [
-  { id: "LOW", label: "Baja" },
-  { id: "MEDIUM", label: "Media" },
-  { id: "HIGH", label: "Alta" },
-  { id: "URGENT", label: "Urgente" },
+  { id: "LOW", label: "Baja", color: "#0284c7" },
+  { id: "MEDIUM", label: "Media", color: "#eab308" },
+  { id: "HIGH", label: "Alta", color: "#f97316" },
+  { id: "URGENT", label: "Urgente", color: "#ef4444" },
 ];
 
 interface TaskFormContentProps {
@@ -138,11 +138,13 @@ function TaskFormContent({
   const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? getOneWeekLaterString());
   const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
   const [isEpic, setIsEpic] = useState<boolean>(initialTask?.isEpic ?? false);
-  const [isMilestone, setIsMilestone] = useState<boolean>(initialTask?.isMilestone ?? false);
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
-  const status = initialTask?.status ?? defaultStatus ?? "TODO";
-  const [priority, setPriority] = useState<string>(initialTask?.priority ?? "MEDIUM");
+  const bucket = initialTask?.bucket ?? defaultStatus ?? "TODO";
+  const [label, setLabel] = useState<string>(initialTask?.label ?? "MEDIUM");
   const [description, setDescription] = useState<string>(initialTask?.description ?? "");
+  const [showSubtasksOnCard, setShowSubtasksOnCard] = useState<boolean>(
+    initialTask?.showSubtasksOnCard ?? false
+  );
 
   // Auto-save feedback
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -227,12 +229,12 @@ function TaskFormContent({
           const res = await createTask({
             projectId,
             title: candidateTitle,
-            status: (updates.status ?? status) || defaultStatus || "TODO",
-            priority: (updates.priority ?? priority) || "MEDIUM",
+            bucket: (updates.bucket ?? bucket) || defaultStatus || "TODO",
+            label: (updates.label ?? label) || "MEDIUM",
             startDate: updates.startDate ?? startDate,
             dueDate: updates.dueDate ?? dueDate,
             isEpic: updates.isEpic ?? isEpic,
-            isMilestone: updates.isMilestone ?? isMilestone,
+            showSubtasksOnCard: updates.showSubtasksOnCard ?? showSubtasksOnCard,
             parentId: updates.parentId !== undefined ? updates.parentId : parentId || undefined,
             assigneeId: updates.assigneeId !== undefined ? updates.assigneeId : assigneeId || undefined,
             description: updates.description !== undefined ? updates.description : description.trim() || undefined,
@@ -277,13 +279,13 @@ function TaskFormContent({
       currentTask?.id,
       title,
       projectId,
-      status,
+      bucket,
       defaultStatus,
-      priority,
+      label,
       startDate,
       dueDate,
       isEpic,
-      isMilestone,
+      showSubtasksOnCard,
       parentId,
       assigneeId,
       description,
@@ -314,6 +316,11 @@ function TaskFormContent({
     },
     [persistChanges]
   );
+
+  const handleToggleShowSubtasksOnCard = (checked: boolean): void => {
+    setShowSubtasksOnCard(checked);
+    triggerImmediateSave({ showSubtasksOnCard: checked });
+  };
 
   return (
     <>
@@ -464,21 +471,50 @@ function TaskFormContent({
               </button>
             </div>
             <Select
-              value={priority}
+              value={label}
               onValueChange={(val) => {
-                setPriority(val);
-                triggerImmediateSave({ priority: val });
+                setLabel(val);
+                triggerImmediateSave({ label: val });
               }}
             >
               <SelectTrigger className="h-9 w-full rounded-xl border border-border bg-background px-3 text-xs text-text-primary">
-                <SelectValue />
+                <SelectValue placeholder="Seleccionar etiqueta">
+                  {(() => {
+                    const sel = priorities.find((p) => p.id === label);
+                    if (!sel) return label;
+                    const c = sel.color || "#0284c7";
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2 rounded-full shrink-0"
+                          style={{ backgroundColor: c }}
+                        />
+                        <span className="truncate">{sel.label}</span>
+                      </span>
+                    );
+                  })()}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {priorities.map((pr) => (
-                  <SelectItem key={pr.id} value={pr.id}>
-                    {pr.label}
-                  </SelectItem>
-                ))}
+                {priorities.map((pr) => {
+                  const prColor = pr.color || "#0284c7";
+                  return (
+                    <SelectItem key={pr.id} value={pr.id}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border"
+                          style={{
+                            backgroundColor: `${prColor}22`,
+                            color: prColor,
+                            borderColor: `${prColor}55`,
+                          }}
+                        >
+                          {pr.label}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -517,52 +553,27 @@ function TaskFormContent({
           </div>
         </div>
 
-        {/* Fila 3: Predecesoras y Hito */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
-              Predecesoras
-            </label>
-            <Input
-              id="task-predecessors"
-              type="text"
-              placeholder="ej. Tarea 1..."
-              value={predecessors}
-              onChange={(e) => {
-                const next = e.target.value;
-                setPredecessors(next);
-                queueDebouncedSave({ predecessors: next.trim() || null });
-              }}
-              onBlur={() => {
-                triggerImmediateSave({ predecessors: predecessors.trim() || null });
-              }}
-              maxLength={500}
-              className="border-border bg-background text-xs rounded-xl h-9"
-            />
-          </div>
-
-          <div className="flex flex-col justify-between gap-1.5 rounded-xl border border-border/80 bg-background/50 p-2.5">
-            <div className="flex items-center gap-1.5">
-              <IconDiamond className="size-4 text-amber-500" />
-              <span className="text-xs font-semibold text-text-primary">Hito</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-text-muted">Punto clave</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isMilestone}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setIsMilestone(next);
-                    triggerImmediateSave({ isMilestone: next });
-                  }}
-                  className="sr-only peer"
-                />
-                <div className="w-8 h-4.5 bg-surface-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-amber-500" />
-              </label>
-            </div>
-          </div>
+        {/* Fila 3: Predecesoras */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="task-predecessors" className="text-xs font-semibold text-text-primary">
+            Predecesoras
+          </label>
+          <Input
+            id="task-predecessors"
+            type="text"
+            placeholder="ej. Tarea 1..."
+            value={predecessors}
+            onChange={(e) => {
+              const next = e.target.value;
+              setPredecessors(next);
+              queueDebouncedSave({ predecessors: next.trim() || null });
+            }}
+            onBlur={() => {
+              triggerImmediateSave({ predecessors: predecessors.trim() || null });
+            }}
+            maxLength={500}
+            className="border-border bg-background text-xs rounded-xl h-9"
+          />
         </div>
 
         {/* Fila 4: Tabs de Descripción y Subtareas */}
@@ -624,6 +635,23 @@ function TaskFormContent({
           {/* Tab 2: Subtareas (matching attached image) */}
           {activeTab === "subtasks" && (
             <div className="flex flex-col pt-1">
+              {/* Switch para mostrar checklist en la tarjeta */}
+              <div className="flex items-center justify-between px-3 py-2 mb-2 rounded-xl bg-surface-elevated/40 border border-border/50">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium text-text-primary">
+                    Mostrar checklist en la tarjeta
+                  </span>
+                  <span className="text-[11px] text-text-muted">
+                    Habilita la lista de verificación interactiva directamente en la tarjeta de la tarea
+                  </span>
+                </div>
+                <Switch
+                  checked={showSubtasksOnCard}
+                  onCheckedChange={handleToggleShowSubtasksOnCard}
+                  aria-label="Mostrar checklist en la tarjeta"
+                />
+              </div>
+
               {/* Header de columnas */}
               <div className="grid grid-cols-12 px-3 py-2 text-xs font-semibold text-text-primary border-b border-border/60">
                 <div className="col-span-7 sm:col-span-8">Título</div>

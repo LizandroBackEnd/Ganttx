@@ -3,9 +3,12 @@ import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export interface TaskStatusBadgeProps {
-  readonly status: string;
+  readonly status?: string;
+  readonly bucket?: string;
   readonly className?: string;
 }
+
+export type TaskBucketBadgeProps = TaskStatusBadgeProps;
 
 const statusStyles: Record<string, string> = {
   TODO: "bg-surface-elevated text-text-secondary border-border/80",
@@ -17,10 +20,12 @@ const statusStyles: Record<string, string> = {
 
 export function TaskStatusBadge({
   status,
+  bucket,
   className,
 }: TaskStatusBadgeProps): React.JSX.Element {
-  const label = TASK_STATUS_LABELS[status as TaskStatus] ?? status;
-  const style = statusStyles[status] ?? "bg-primary/10 text-primary border-primary/30";
+  const value = bucket ?? status ?? "TODO";
+  const label = TASK_STATUS_LABELS[value as TaskStatus] ?? value;
+  const style = statusStyles[value] ?? "bg-primary/10 text-primary border-primary/30";
 
   return (
     <Badge
@@ -31,3 +36,5 @@ export function TaskStatusBadge({
     </Badge>
   );
 }
+
+export const TaskBucketBadge = TaskStatusBadge;

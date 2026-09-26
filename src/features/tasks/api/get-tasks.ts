@@ -4,7 +4,8 @@ import { auth } from "@/lib/auth";
 import type { TaskDTO } from "../types/task.types";
 
 export interface GetTasksFilter {
-  readonly status?: string;
+  readonly bucket?: string;
+  readonly status?: string; // backwards compatibility
   readonly assigneeId?: string;
 }
 
@@ -38,23 +39,25 @@ export async function getTasksByProjectId(
     return [];
   }
 
+  const activeBucket = filter?.bucket ?? filter?.status;
+
   const tasks = await prisma.task.findMany({
     where: {
       projectId,
-      ...(filter?.status ? { status: filter.status } : {}),
+      ...(activeBucket ? { bucket: activeBucket } : {}),
       ...(filter?.assigneeId ? { assigneeId: filter.assigneeId } : {}),
     },
     select: {
       id: true,
       title: true,
       description: true,
-      priority: true,
-      status: true,
+      label: true,
+      bucket: true,
       startDate: true,
       dueDate: true,
       predecessors: true,
       isEpic: true,
-      isMilestone: true,
+      showSubtasksOnCard: true,
       parentId: true,
       parent: {
         select: {
@@ -65,6 +68,25 @@ export async function getTasksByProjectId(
       _count: {
         select: {
           subtasks: true,
+        },
+      },
+      subtasks: {
+        select: {
+          id: true,
+          title: true,
+          bucket: true,
+          assigneeId: true,
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "asc",
         },
       },
       projectId: true,
@@ -92,13 +114,27 @@ export async function getTasksByProjectId(
     id: t.id,
     title: t.title,
     description: t.description,
-    priority: t.priority,
-    status: t.status,
+    label: t.label,
+    bucket: t.bucket,
     startDate: formatLocalDateToIsoString(t.startDate),
     dueDate: formatLocalDateToIsoString(t.dueDate),
     predecessors: t.predecessors,
     isEpic: t.isEpic,
-    isMilestone: t.isMilestone,
+    showSubtasksOnCard: t.showSubtasksOnCard,
+    subtasks: t.subtasks.map((st) => ({
+      id: st.id,
+      title: st.title,
+      bucket: st.bucket,
+      assigneeId: st.assigneeId,
+      assignee: st.assignee
+        ? {
+            id: st.assignee.id,
+            name: st.assignee.name,
+            email: st.assignee.email,
+            image: st.assignee.image,
+          }
+        : null,
+    })),
     parentId: t.parentId,
     parent: t.parent
       ? {
@@ -137,13 +173,13 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
       id: true,
       title: true,
       description: true,
-      priority: true,
-      status: true,
+      label: true,
+      bucket: true,
       startDate: true,
       dueDate: true,
       predecessors: true,
       isEpic: true,
-      isMilestone: true,
+      showSubtasksOnCard: true,
       parentId: true,
       parent: {
         select: {
@@ -154,6 +190,25 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
       _count: {
         select: {
           subtasks: true,
+        },
+      },
+      subtasks: {
+        select: {
+          id: true,
+          title: true,
+          bucket: true,
+          assigneeId: true,
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "asc",
         },
       },
       projectId: true,
@@ -188,13 +243,27 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
     id: task.id,
     title: task.title,
     description: task.description,
-    priority: task.priority,
-    status: task.status,
+    label: task.label,
+    bucket: task.bucket,
     startDate: formatLocalDateToIsoString(task.startDate),
     dueDate: formatLocalDateToIsoString(task.dueDate),
     predecessors: task.predecessors,
     isEpic: task.isEpic,
-    isMilestone: task.isMilestone,
+    showSubtasksOnCard: task.showSubtasksOnCard,
+    subtasks: task.subtasks.map((st) => ({
+      id: st.id,
+      title: st.title,
+      bucket: st.bucket,
+      assigneeId: st.assigneeId,
+      assignee: st.assignee
+        ? {
+            id: st.assignee.id,
+            name: st.assignee.name,
+            email: st.assignee.email,
+            image: st.assignee.image,
+          }
+        : null,
+    })),
     parentId: task.parentId,
     parent: task.parent
       ? {

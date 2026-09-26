@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { IconCrown, IconDiamond } from "@tabler/icons-react";
+import { IconCrown } from "@tabler/icons-react";
 import type { TaskDTO } from "@/features/tasks";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
@@ -92,7 +92,7 @@ export function GanttBar({
       };
     }
 
-    switch (task.priority) {
+    switch (task.label) {
       case "LOW":
         return {
           bg: "bg-gradient-to-r from-emerald-500/15 via-teal-500/20 to-emerald-500/25 border-emerald-500/40 hover:border-emerald-400",
@@ -123,7 +123,7 @@ export function GanttBar({
           handle: "bg-rose-400",
         };
     }
-  }, [task.isEpic, task.priority]);
+  }, [task.isEpic, task.label]);
 
   return (
     <div
@@ -164,13 +164,10 @@ export function GanttBar({
           {task.isEpic && (
             <IconCrown className="size-3 text-purple-300 shrink-0" />
           )}
-          {task.isMilestone && (
-            <IconDiamond className="size-3 text-amber-300 shrink-0" />
-          )}
           <span className="truncate">{task.title}</span>
         </div>
         <span className="font-mono text-[10px] text-text-muted ml-1 shrink-0">
-          {task.status}
+          {task.bucket}
         </span>
       </div>
 

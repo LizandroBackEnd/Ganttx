@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, ProjectRole, TaskPriority, TaskStatus } from "@prisma/client";
+import { PrismaClient, ProjectRole } from "@prisma/client";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -45,8 +45,8 @@ async function main(): Promise<void> {
     {
       title: "Set up Prisma schema and migrations",
       description: "Define all models, enums, indexes, and run initial migration",
-      priority: TaskPriority.HIGH,
-      status: TaskStatus.DONE,
+      label: "HIGH",
+      bucket: "DONE",
       progress: 100,
       startDate: today,
       dueDate: addDays(today, 2),
@@ -57,8 +57,8 @@ async function main(): Promise<void> {
     {
       title: "Implement Google OAuth with Auth.js",
       description: "Configure Google provider, Prisma adapter, session handling",
-      priority: TaskPriority.HIGH,
-      status: TaskStatus.IN_PROGRESS,
+      label: "HIGH",
+      bucket: "IN_PROGRESS",
       progress: 60,
       startDate: addDays(today, 1),
       dueDate: addDays(today, 4),
@@ -69,8 +69,8 @@ async function main(): Promise<void> {
     {
       title: "Build Month calendar view",
       description: "Render days grid, task chips, navigation controls",
-      priority: TaskPriority.MEDIUM,
-      status: TaskStatus.TODO,
+      label: "MEDIUM",
+      bucket: "TODO",
       progress: 0,
       startDate: addDays(today, 3),
       dueDate: addDays(today, 7),
@@ -81,8 +81,8 @@ async function main(): Promise<void> {
     {
       title: "Build interactive Gantt chart",
       description: "Horizontal timeline with draggable/resizable bars",
-      priority: TaskPriority.HIGH,
-      status: TaskStatus.TODO,
+      label: "HIGH",
+      bucket: "TODO",
       progress: 0,
       startDate: addDays(today, 5),
       dueDate: addDays(today, 12),
@@ -93,8 +93,8 @@ async function main(): Promise<void> {
     {
       title: "Wire real-time SSE sync",
       description: "SSE Route Handler + client EventSource for live updates",
-      priority: TaskPriority.URGENT,
-      status: TaskStatus.TODO,
+      label: "URGENT",
+      bucket: "TODO",
       progress: 0,
       startDate: addDays(today, 7),
       dueDate: addDays(today, 14),

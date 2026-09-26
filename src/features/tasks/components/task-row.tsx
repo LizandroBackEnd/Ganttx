@@ -6,7 +6,7 @@ import { TaskStatusBadge } from "./task-status-badge";
 import { TaskPriorityBadge } from "./task-priority-badge";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { updateTaskStatus, deleteTask } from "../api/task-mutations";
-import { IconCheck, IconPencil, IconTrash, IconCrown, IconDiamond } from "@tabler/icons-react";
+import { IconCheck, IconPencil, IconTrash, IconCrown } from "@tabler/icons-react";
 import { sileo } from "sileo";
 import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
 
@@ -33,7 +33,7 @@ export function TaskRow({
 
   const handleStatusChange = async (newStatus: string): Promise<void> => {
     try {
-      const res = await updateTaskStatus({ taskId: task.id, status: newStatus });
+      const res = await updateTaskStatus({ taskId: task.id, bucket: newStatus });
       if (res.success) {
         sileo.success({
           title: newStatus === "DONE" ? "Tarea completada" : "Estado actualizado",
@@ -90,26 +90,18 @@ export function TaskRow({
           {/* Quick status toggle */}
           <button
             type="button"
-            onClick={() => handleStatusChange(task.status === "DONE" ? "TODO" : "DONE")}
-            aria-label={task.status === "DONE" ? "Marcar como incompleta" : "Marcar como completada"}
-            className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors ${
-              task.status === "DONE"
+            onClick={() => handleStatusChange(task.bucket === "DONE" ? "TODO" : "DONE")}
+            aria-label={task.bucket === "DONE" ? "Marcar como incompleta" : "Marcar como completada"}
+            className={`flex size-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer ${
+              task.bucket === "DONE"
                 ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
                 : "border-border hover:border-primary"
             }`}
           >
-            {task.status === "DONE" && (
+            {task.bucket === "DONE" && (
               <IconCheck className="size-3.5 stroke-3" />
             )}
           </button>
-
-          {/* Milestone Badge */}
-          {task.isMilestone && (
-            <span className="shrink-0 rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[11px] font-bold text-amber-500 flex items-center gap-1">
-              <IconDiamond className="size-3" />
-              <span>Hito</span>
-            </span>
-          )}
 
           {/* Title */}
           <div className="min-w-0 flex-1">
@@ -127,7 +119,7 @@ export function TaskRow({
               )}
               <span
                 className={`text-sm font-medium text-text-primary ${
-                  task.status === "DONE" ? "line-through text-text-muted" : ""
+                  task.bucket === "DONE" ? "line-through text-text-muted" : ""
                 }`}
               >
                 {task.title}
@@ -156,11 +148,11 @@ export function TaskRow({
             </span>
           )}
 
-          {/* Estado & Prioridad */}
-          <TaskPriorityBadge priority={task.priority} />
-          <TaskStatusBadge status={task.status} />
+          {/* Estado & Prioridad/Etiqueta */}
+          <TaskPriorityBadge label={task.label} customPriorities={customPriorities} />
+          <TaskStatusBadge bucket={task.bucket} />
 
-          {/* 5. Asignado */}
+          {/* Asignado */}
           {task.assignee ? (
             <span
               title={task.assignee.name ?? task.assignee.email}
@@ -178,7 +170,7 @@ export function TaskRow({
               <button
                 type="button"
                 onClick={() => setIsEditDialogOpen(true)}
-                className="rounded p-1 text-text-muted hover:bg-surface-elevated hover:text-text-primary"
+                className="rounded p-1 text-text-muted hover:bg-surface-elevated hover:text-text-primary cursor-pointer"
                 title="Editar tarea"
               >
                 <IconPencil className="size-3.5" />
@@ -187,7 +179,7 @@ export function TaskRow({
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="rounded p-1 text-text-muted hover:bg-destructive/20 hover:text-destructive"
+                className="rounded p-1 text-text-muted hover:bg-destructive/20 hover:text-destructive cursor-pointer"
                 title="Eliminar tarea"
               >
                 <IconTrash className="size-3.5" />

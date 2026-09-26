@@ -19,6 +19,8 @@ export interface CustomPriorityOption {
   readonly color?: string;
 }
 
+export type CustomLabelOption = CustomPriorityOption;
+
 export interface TaskParentDTO {
   readonly id: string;
   readonly title: string;
@@ -28,16 +30,17 @@ export interface TaskDTO {
   readonly id: string;
   readonly title: string; // Nombre de la tarea
   readonly description: string | null;
-  readonly priority: string;
-  readonly status: string;
+  readonly label: string;
+  readonly bucket: string;
   readonly startDate: string;
   readonly dueDate: string;
   readonly predecessors: string | null;
   readonly isEpic: boolean;
-  readonly isMilestone: boolean;
   readonly parentId: string | null;
   readonly parent?: TaskParentDTO | null;
   readonly subtasksCount?: number;
+  readonly showSubtasksOnCard?: boolean;
+  readonly subtasks?: readonly SubtaskDTO[];
   readonly projectId: string;
   readonly assigneeId: string | null;
   readonly creatorId: string;
@@ -49,7 +52,7 @@ export interface TaskDTO {
 export interface SubtaskDTO {
   readonly id: string;
   readonly title: string;
-  readonly status: string;
+  readonly bucket: string;
   readonly assigneeId: string | null;
   readonly assignee: TaskAssigneeDTO | null;
 }
@@ -91,13 +94,13 @@ export const createTaskSchema = z
     projectId: z.string().uuid("ID de proyecto inválido"),
     title: z.string().trim().min(1, "El nombre de la tarea es obligatorio").max(255),
     description: z.string().trim().max(2000).optional().nullable(),
-    priority: z.string().trim().min(1).max(50).default("MEDIUM"),
-    status: z.string().trim().min(1).max(50).default("TODO"),
+    label: z.string().trim().min(1).max(50).default("MEDIUM"),
+    bucket: z.string().trim().min(1, "El bucket es obligatorio").max(50),
     startDate: z.string().regex(dateRegex, "Formato de fecha de inicio inválido"),
     dueDate: z.string().regex(dateRegex, "Formato de fecha de fin inválido"),
     predecessors: z.string().trim().max(500).optional().nullable(),
     isEpic: z.boolean().default(false),
-    isMilestone: z.boolean().default(false),
+    showSubtasksOnCard: z.boolean().default(false),
     parentId: z.string().uuid("ID de tarea padre inválido").optional().nullable(),
     assigneeId: z.string().uuid("ID de asignado inválido").optional().nullable(),
   })
@@ -106,19 +109,19 @@ export const createTaskSchema = z
     path: ["dueDate"],
   });
 
-export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type CreateTaskInput = z.input<typeof createTaskSchema>;
 
 export const updateTaskSchema = z.object({
   taskId: z.string().uuid("ID de tarea inválido"),
   title: z.string().trim().min(1).max(255).optional(),
   description: z.string().trim().max(2000).optional().nullable(),
-  priority: z.string().trim().max(50).optional(),
-  status: z.string().trim().max(50).optional(),
+  label: z.string().trim().max(50).optional(),
+  bucket: z.string().trim().max(50).optional(),
   startDate: z.string().regex(dateRegex).optional(),
   dueDate: z.string().regex(dateRegex).optional(),
   predecessors: z.string().trim().max(500).optional().nullable(),
   isEpic: z.boolean().optional(),
-  isMilestone: z.boolean().optional(),
+  showSubtasksOnCard: z.boolean().optional(),
   parentId: z.string().uuid().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
 });
@@ -138,12 +141,14 @@ export const updateTaskDatesSchema = z
 
 export type UpdateTaskDatesInput = z.infer<typeof updateTaskDatesSchema>;
 
-export const updateTaskStatusSchema = z.object({
+export const updateTaskBucketSchema = z.object({
   taskId: z.string().uuid("ID de tarea inválido"),
-  status: z.string().min(1).max(50),
+  bucket: z.string().min(1).max(50),
 });
 
-export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
+export type UpdateTaskBucketInput = z.infer<typeof updateTaskBucketSchema>;
+export const updateTaskStatusSchema = updateTaskBucketSchema;
+export type UpdateTaskStatusInput = UpdateTaskBucketInput;
 
 export const deleteTaskSchema = z.object({
   taskId: z.string().uuid("ID de tarea inválido"),
