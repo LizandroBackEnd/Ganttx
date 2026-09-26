@@ -23,7 +23,7 @@ export function ProjectSidebar({
   taskCount,
 }: ProjectSidebarProps): React.JSX.Element {
   return (
-    <aside className="w-full md:w-64 shrink-0 min-h-[calc(100vh-7.5rem)] border-b md:border-b-0 md:border-r border-border bg-surface/50 backdrop-blur-xs p-4 flex flex-col justify-between">
+    <aside className="w-full md:w-64 shrink-0 h-full border-b md:border-b-0 md:border-r border-border bg-surface/50 backdrop-blur-xs p-4 flex flex-col justify-between overflow-y-auto">
       <div className="flex flex-col gap-1.5">
         <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
           Vistas del Proyecto

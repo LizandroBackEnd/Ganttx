@@ -14,8 +14,8 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { inviteMember } from "../api/project-mutations";
-
 import { IconPlus } from "@tabler/icons-react";
+import { sileo } from "sileo";
 
 export interface InviteMemberDialogProps {
   readonly projectId: string;
@@ -51,16 +51,30 @@ export function InviteMemberDialog({
 
       if (!result.success) {
         setError(result.error);
+        sileo.error({
+          title: "Error al invitar",
+          description: result.error,
+        });
         setIsLoading(false);
         return;
       }
 
+      const invitedEmail = email.trim();
       setIsOpen(false);
       setEmail("");
       setRole("MEMBER");
+      sileo.success({
+        title: "Invitación enviada",
+        description: `Se envió una invitación a "${invitedEmail}".`,
+      });
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado al invitar al miembro");
+      const msg = "Ocurrió un error inesperado al invitar al miembro";
+      setError(msg);
+      sileo.error({
+        title: "Error al invitar",
+        description: msg,
+      });
     } finally {
       setIsLoading(false);
     }

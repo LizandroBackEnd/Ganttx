@@ -236,3 +236,37 @@
     font-family: var(--font-sans);
   }
 }
+/* Sileo Toaster layer & High-Contrast Theming */
+[data-sileo-viewport] {
+  z-index: 99999 !important;
+}
+
+/* Sileo with data-theme="dark" renders an off-white pill (#f2f2f2) */
+[data-sileo-viewport][data-theme="dark"] {
+  --sileo-card-text: #09090b;
+  --sileo-card-text-muted: #475569;
+  --sileo-card-border: #cbd5e1;
+  --sileo-card-bg-subtle: #e2e8f0;
+  --sileo-card-input-bg: #ffffff;
+  --sileo-card-input-border: #94a3b8;
+}
+
+[data-sileo-viewport][data-theme="dark"] [data-sileo-title] {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+/* Sileo with data-theme="light" renders a dark charcoal pill (#1a1a1a) */
+[data-sileo-viewport][data-theme="light"] {
+  --sileo-card-text: #f8fafc;
+  --sileo-card-text-muted: #94a3b8;
+  --sileo-card-border: #334155;
+  --sileo-card-bg-subtle: #27272a;
+  --sileo-card-input-bg: #1e293b;
+  --sileo-card-input-border: #475569;
+}
+
+[data-sileo-viewport][data-theme="light"] [data-sileo-title] {
+  color: #f8fafc !important;
+  font-weight: 700 !important;
+}

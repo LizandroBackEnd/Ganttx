@@ -7,6 +7,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { removeMember } from "../api/project-mutations";
+import { sileo } from "sileo";
 import type { ProjectMemberDTO } from "../types/project.types";
 import type { ProjectRole } from "@/lib/constants";
 
@@ -29,20 +30,26 @@ export function ProjectMembersTable({
   const isPrivileged = currentUserRole === "OWNER" || currentUserRole === "ADMIN";
 
   const handleRemove = async (userId: string, email: string): Promise<void> => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar a ${email} de este proyecto?`)) {
-      return;
-    }
-
     try {
       setRemovingId(userId);
       const res = await removeMember({ projectId, userId });
       if (!res.success) {
-        alert(res.error);
+        sileo.error({
+          title: "Error al eliminar miembro",
+          description: res.error,
+        });
         return;
       }
+      sileo.success({
+        title: "Miembro eliminado",
+        description: `"${email}" fue eliminado del proyecto.`,
+      });
       router.refresh();
     } catch {
-      alert("Error al eliminar miembro");
+      sileo.error({
+        title: "Error al eliminar miembro",
+        description: "Ocurrió un error inesperado al eliminar el miembro.",
+      });
     } finally {
       setRemovingId(null);
     }

@@ -14,8 +14,8 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { createProject } from "../api/project-mutations";
-
 import { IconPlus } from "@tabler/icons-react";
+import { sileo } from "sileo";
 
 export interface CreateProjectDialogProps {
   readonly trigger?: React.ReactNode;
@@ -48,17 +48,31 @@ export function CreateProjectDialog({
 
       if (!result.success) {
         setError(result.error);
+        sileo.error({
+          title: "Error al crear proyecto",
+          description: result.error,
+        });
         setIsLoading(false);
         return;
       }
 
+      const createdName = name.trim();
       setIsOpen(false);
       setName("");
       setDescription("");
+      sileo.success({
+        title: "Proyecto creado",
+        description: `"${createdName}" fue creado exitosamente.`,
+      });
       router.push(`/projects/${result.data.id}`);
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado al crear el proyecto");
+      const msg = "Ocurrió un error inesperado al crear el proyecto";
+      setError(msg);
+      sileo.error({
+        title: "Error al crear proyecto",
+        description: msg,
+      });
     } finally {
       setIsLoading(false);
     }

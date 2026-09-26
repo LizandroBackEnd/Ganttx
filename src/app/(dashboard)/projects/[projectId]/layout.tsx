@@ -23,9 +23,9 @@ export default async function ProjectLayout({
   }
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col h-full max-h-full overflow-hidden">
       {/* Project Subheader */}
-      <div className="border-b border-border bg-surface/40 backdrop-blur-xs px-6 py-3.5">
+      <div className="shrink-0 border-b border-border bg-surface/40 backdrop-blur-xs px-6 py-3.5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <ProjectBackButton projectId={projectId} />
@@ -56,7 +56,7 @@ export default async function ProjectLayout({
       </div>
 
       {/* Project Content (Full-width for sidebar docking) */}
-      <div className="flex-1 w-full flex flex-col">
+      <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden">
         {children}
       </div>
     </div>

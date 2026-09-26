@@ -6,7 +6,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   const projects = await getProjects();
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8">
+    <div className="mx-auto max-w-7xl px-6 py-8 h-full w-full overflow-y-auto">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6 mb-8">
         <div>

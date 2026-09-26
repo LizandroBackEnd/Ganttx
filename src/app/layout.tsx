@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat_Alternates, Geist_Mono } from "next/font/google";
-import { ThemeProvider, ThemeScript } from "@/shared/components";
+import { ThemeProvider, ThemeScript, Toaster } from "@/shared/components";
+import "sileo/styles.css";
 import "./globals.css";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -49,6 +50,7 @@ export default function RootLayout({
       <body className={`${montserratAlternates.className} min-h-full flex flex-col bg-background text-text-primary`}>
         <ThemeProvider defaultTheme="dark">
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

@@ -15,8 +15,9 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { DatePicker } from "@/shared/components/ui/date-picker";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
-import { createTask, updateTask } from "../api/task-mutations";
-import { IconSettings, IconCrown } from "@tabler/icons-react";
+import { createTask, updateTask, deleteTask } from "../api/task-mutations";
+import { IconSettings, IconCrown, IconTrash } from "@tabler/icons-react";
+import { sileo } from "sileo";
 import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
 
 export interface ProjectMemberOption {
@@ -38,9 +39,13 @@ export interface TaskFormDialogProps {
   readonly customStatuses?: readonly CustomStatusOption[] | null;
   readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly taskToEdit?: TaskDTO;
+  readonly task?: TaskDTO;
+  readonly defaultStatus?: string;
   readonly trigger?: React.ReactNode;
   readonly isOpenControlled?: boolean;
   readonly onOpenChangeControlled?: (open: boolean) => void;
+  readonly isOpen?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 function formatLocalDate(d: Date): string {
@@ -91,16 +96,23 @@ export function TaskFormDialog({
   customStatuses = fallbackStatuses,
   customPriorities = fallbackPriorities,
   taskToEdit,
+  task: taskAlias,
+  defaultStatus,
   trigger,
   isOpenControlled,
   onOpenChangeControlled,
+  isOpen: isOpenAlias,
+  onOpenChange: onOpenChangeAlias,
 }: TaskFormDialogProps): React.JSX.Element {
+  const activeTask = taskAlias ?? taskToEdit;
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
-  const isControlled = isOpenControlled !== undefined;
-  const isOpen = isControlled ? isOpenControlled : internalOpen;
+  const effectiveIsOpen = isOpenAlias !== undefined ? isOpenAlias : isOpenControlled;
+  const effectiveOnOpenChange = onOpenChangeAlias !== undefined ? onOpenChangeAlias : onOpenChangeControlled;
+  const isControlled = effectiveIsOpen !== undefined;
+  const isOpen = isControlled ? effectiveIsOpen : internalOpen;
   const setOpen = isControlled
-    ? (open: boolean) => onOpenChangeControlled?.(open)
+    ? (open: boolean) => effectiveOnOpenChange?.(open)
     : setInternalOpen;
 
   const [statuses, setStatuses] = useState<CustomStatusOption[]>(
@@ -112,33 +124,63 @@ export function TaskFormDialog({
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
 
   // 1. ID / Clave
-  const [customId, setCustomId] = useState<string>(taskToEdit?.customId ?? "");
+  const [customId, setCustomId] = useState<string>(activeTask?.customId ?? "");
   // 2. Actividad / Título
-  const [title, setTitle] = useState<string>(taskToEdit?.title ?? "");
+  const [title, setTitle] = useState<string>(activeTask?.title ?? "");
   // 3. Requerimiento
-  const [requirement, setRequirement] = useState<string>(taskToEdit?.requirement ?? "");
+  const [requirement, setRequirement] = useState<string>(activeTask?.requirement ?? "");
   // 4. Sprint
-  const [sprint, setSprint] = useState<string>(taskToEdit?.sprint ?? "");
+  const [sprint, setSprint] = useState<string>(activeTask?.sprint ?? "");
   // 5. Asignado
-  const [assigneeId, setAssigneeId] = useState<string>(taskToEdit?.assigneeId ?? "");
+  const [assigneeId, setAssigneeId] = useState<string>(activeTask?.assigneeId ?? "");
   // 6, 7, 8. Fechas & Duración
-  const [startDate, setStartDate] = useState<string>(taskToEdit?.startDate ?? getTodayString());
-  const [dueDate, setDueDate] = useState<string>(taskToEdit?.dueDate ?? getOneWeekLaterString());
+  const [startDate, setStartDate] = useState<string>(activeTask?.startDate ?? getTodayString());
+  const [dueDate, setDueDate] = useState<string>(activeTask?.dueDate ?? getOneWeekLaterString());
   const [durationDays, setDurationDays] = useState<number>(
-    taskToEdit?.durationDays ?? calculateDuration(taskToEdit?.startDate ?? getTodayString(), taskToEdit?.dueDate ?? getOneWeekLaterString())
+    activeTask?.durationDays ?? calculateDuration(activeTask?.startDate ?? getTodayString(), activeTask?.dueDate ?? getOneWeekLaterString())
   );
   // 9. Predecesoras
-  const [predecessors, setPredecessors] = useState<string>(taskToEdit?.predecessors ?? "");
+  const [predecessors, setPredecessors] = useState<string>(activeTask?.predecessors ?? "");
   // EPICs
-  const [isEpic, setIsEpic] = useState<boolean>(taskToEdit?.isEpic ?? false);
-  const [parentId, setParentId] = useState<string>(taskToEdit?.parentId ?? "");
+  const [isEpic, setIsEpic] = useState<boolean>(activeTask?.isEpic ?? false);
+  const [parentId, setParentId] = useState<string>(activeTask?.parentId ?? "");
   // Status & Priority
-  const [status, setStatus] = useState<string>(taskToEdit?.status ?? "TODO");
-  const [priority, setPriority] = useState<string>(taskToEdit?.priority ?? "MEDIUM");
-  const [description, setDescription] = useState<string>(taskToEdit?.description ?? "");
+  const [status, setStatus] = useState<string>(activeTask?.status ?? defaultStatus ?? "TODO");
+  const [priority, setPriority] = useState<string>(activeTask?.priority ?? "MEDIUM");
+  const [description, setDescription] = useState<string>(activeTask?.description ?? "");
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDeleteTask = async (): Promise<void> => {
+    if (!activeTask) return;
+
+    try {
+      setIsDeleting(true);
+      const res = await deleteTask({ taskId: activeTask.id });
+      if (!res.success) {
+        sileo.error({
+          title: "Error al eliminar tarea",
+          description: res.error,
+        });
+        setIsDeleting(false);
+        return;
+      }
+      sileo.success({
+        title: "Tarea eliminada",
+        description: `"${activeTask.title}" fue eliminada correctamente.`,
+      });
+      setOpen(false);
+      router.refresh();
+    } catch {
+      sileo.error({
+        title: "Error al eliminar tarea",
+        description: "Ocurrió un error inesperado al eliminar la tarea.",
+      });
+      setIsDeleting(false);
+    }
+  };
 
   // Auto-recalculate duration when dates change
   const handleStartDateChange = (newStart: string): void => {
@@ -160,8 +202,6 @@ export function TaskFormDialog({
     }
   };
 
-
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!title.trim()) {
@@ -177,9 +217,9 @@ export function TaskFormDialog({
       setIsLoading(true);
       setError(null);
 
-      if (taskToEdit) {
+      if (activeTask) {
         const res = await updateTask({
-          taskId: taskToEdit.id,
+          taskId: activeTask.id,
           customId: customId.trim() || null,
           title: title.trim(),
           description: description.trim() || null,
@@ -198,9 +238,18 @@ export function TaskFormDialog({
 
         if (!res.success) {
           setError(res.error);
+          sileo.error({
+            title: "Error al actualizar tarea",
+            description: res.error,
+          });
           setIsLoading(false);
           return;
         }
+
+        sileo.success({
+          title: "Tarea actualizada",
+          description: `"${title.trim()}" se guardó correctamente.`,
+        });
       } else {
         const res = await createTask({
           projectId,
@@ -222,13 +271,22 @@ export function TaskFormDialog({
 
         if (!res.success) {
           setError(res.error);
+          sileo.error({
+            title: "Error al crear tarea",
+            description: res.error,
+          });
           setIsLoading(false);
           return;
         }
+
+        sileo.success({
+          title: "Tarea creada",
+          description: `"${title.trim()}" se agregó al proyecto.`,
+        });
       }
 
       setOpen(false);
-      if (!taskToEdit) {
+      if (!activeTask) {
         setCustomId("");
         setTitle("");
         setRequirement("");
@@ -240,7 +298,12 @@ export function TaskFormDialog({
       }
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado al guardar la tarea");
+      const msg = "Ocurrió un error inesperado al guardar la tarea";
+      setError(msg);
+      sileo.error({
+        title: "Error al guardar tarea",
+        description: msg,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -561,23 +624,39 @@ export function TaskFormDialog({
               </div>
             </div>
 
-            <DialogFooter className="flex justify-end gap-2 border-t border-border/40 pt-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setOpen(false)}
-                disabled={isLoading}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                variant="default"
-                disabled={isLoading}
-                className="bg-primary text-primary-foreground hover:bg-primary-hover font-semibold"
-              >
-                {isLoading ? "Guardando..." : taskToEdit ? "Actualizar Tarea" : "Crear Tarea"}
-              </Button>
+            <DialogFooter className="flex flex-row items-center justify-between gap-2 border-t border-border/40 pt-4">
+              <div>
+                {activeTask && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeleteTask}
+                    disabled={isLoading || isDeleting}
+                    className="gap-1.5"
+                  >
+                    <IconTrash className="size-4" />
+                    <span>{isDeleting ? "Eliminando..." : "Eliminar Tarea"}</span>
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                  disabled={isLoading || isDeleting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="default"
+                  disabled={isLoading || isDeleting}
+                  className="bg-primary text-primary-foreground hover:bg-primary-hover font-semibold"
+                >
+                  {isLoading ? "Guardando..." : activeTask ? "Actualizar Tarea" : "Crear Tarea"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

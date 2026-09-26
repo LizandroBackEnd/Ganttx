@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { updateProject, deleteProject } from "../api/project-mutations";
+import { sileo } from "sileo";
 import type { ProjectRole } from "@/lib/constants";
 
 export interface ProjectSettingsFormProps {
@@ -48,35 +49,54 @@ export function ProjectSettingsForm({
 
       if (!res.success) {
         setMessage({ type: "error", text: res.error });
+        sileo.error({
+          title: "Error al actualizar",
+          description: res.error,
+        });
         return;
       }
 
       setMessage({ type: "success", text: "Proyecto actualizado correctamente" });
+      sileo.success({
+        title: "Proyecto actualizado",
+        description: "Los cambios se guardaron correctamente.",
+      });
       router.refresh();
     } catch {
-      setMessage({ type: "error", text: "Error al actualizar el proyecto" });
+      const msg = "Error al actualizar el proyecto";
+      setMessage({ type: "error", text: msg });
+      sileo.error({
+        title: "Error al actualizar",
+        description: msg,
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!confirm("¿Estás seguro? Esta acción eliminará permanentemente el proyecto y todas sus tareas.")) {
-      return;
-    }
-
     try {
       setIsDeleting(true);
       const res = await deleteProject({ projectId });
       if (!res.success) {
-        alert(res.error);
+        sileo.error({
+          title: "Error al eliminar proyecto",
+          description: res.error,
+        });
         setIsDeleting(false);
         return;
       }
+      sileo.success({
+        title: "Proyecto eliminado",
+        description: "El proyecto fue eliminado exitosamente.",
+      });
       router.push("/");
       router.refresh();
     } catch {
-      alert("Error al eliminar el proyecto");
+      sileo.error({
+        title: "Error al eliminar",
+        description: "Ocurrió un error inesperado al eliminar el proyecto.",
+      });
       setIsDeleting(false);
     }
   };

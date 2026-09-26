@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCalendar, ViewSwitcher, DateNavigator, CalendarGrid } from "@/features/calendar";
-import { TaskTable, TaskFormDialog, type ProjectMemberOption } from "@/features/tasks";
+import { TaskBoard, TaskFormDialog, type ProjectMemberOption } from "@/features/tasks";
 import { GanttChart } from "@/features/gantt";
 import { useProjectEvents } from "../hooks/use-project-events";
 import {
@@ -83,7 +83,7 @@ export function ProjectWorkspace({
     .map((t) => ({ id: t.id, title: t.title, customId: t.customId }));
 
   return (
-    <div className="flex flex-col md:flex-row flex-1 min-h-[calc(100vh-7.5rem)] items-stretch">
+    <div className="flex flex-col md:flex-row flex-1 min-h-0 h-full items-stretch overflow-hidden">
       {/* Left Sidebar */}
       <ProjectSidebar
         projectId={project.id}
@@ -93,10 +93,10 @@ export function ProjectWorkspace({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 w-full min-w-0 p-6 flex flex-col gap-5 overflow-x-hidden">
+      <div className="flex-1 min-h-0 h-full w-full min-w-0 p-6 flex flex-col gap-4 overflow-hidden">
         {/* Calendar Navigation Toolbar */}
         {primaryView === "calendar" && (
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-4">
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-4">
             <div className="flex flex-wrap items-center gap-3">
               <ViewSwitcher
                 currentView={viewMode}
@@ -114,7 +114,7 @@ export function ProjectWorkspace({
 
         {/* Gantt Toolbar with Nueva Tarea */}
         {primaryView === "gantt" && (
-          <div className="flex items-center justify-between gap-4 border-b border-border/50 pb-4">
+          <div className="shrink-0 flex items-center justify-between gap-4 border-b border-border/50 pb-4">
             <div>
               <h2 className="text-lg font-bold text-text-primary tracking-tight">
                 Cronograma Gantt
@@ -145,9 +145,9 @@ export function ProjectWorkspace({
         )}
 
         {/* Active View Component */}
-        <div className="w-full">
+        <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">
           {primaryView === "tasks" ? (
-            <TaskTable
+            <TaskBoard
               projectId={project.id}
               tasks={tasks}
               members={members}
@@ -157,25 +157,29 @@ export function ProjectWorkspace({
               canEdit={true}
             />
           ) : primaryView === "gantt" ? (
-            <GanttChart
-              projectId={project.id}
-              tasks={tasks}
-              members={members}
-              availableEpics={availableEpics}
-              customStatuses={project.customStatuses}
-              customPriorities={project.customPriorities}
-            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <GanttChart
+                projectId={project.id}
+                tasks={tasks}
+                members={members}
+                availableEpics={availableEpics}
+                customStatuses={project.customStatuses}
+                customPriorities={project.customPriorities}
+              />
+            </div>
           ) : (
-            <CalendarGrid
-              currentDate={currentDate}
-              viewMode={viewMode}
-              tasks={tasks}
-              projectId={project.id}
-              members={members}
-              availableEpics={availableEpics}
-              customStatuses={project.customStatuses}
-              customPriorities={project.customPriorities}
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <CalendarGrid
+                currentDate={currentDate}
+                viewMode={viewMode}
+                tasks={tasks}
+                projectId={project.id}
+                members={members}
+                availableEpics={availableEpics}
+                customStatuses={project.customStatuses}
+                customPriorities={project.customPriorities}
+              />
+            </div>
           )}
         </div>
       </div>

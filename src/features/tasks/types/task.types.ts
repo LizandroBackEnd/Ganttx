@@ -135,3 +135,40 @@ export const deleteTaskSchema = z.object({
 });
 
 export type DeleteTaskInput = z.infer<typeof deleteTaskSchema>;
+
+export interface BucketOption {
+  readonly id: string;
+  readonly label: string;
+  readonly color?: string;
+}
+
+export const DEFAULT_BUCKETS: readonly BucketOption[] = [
+  { id: "BACKLOG", label: "Backlog", color: "#64748b" },
+  { id: "TODO", label: "Por Hacer", color: "#0ea5e9" },
+  { id: "IN_PROGRESS", label: "En Progreso", color: "#f59e0b" },
+  { id: "IN_REVIEW", label: "En Revisión", color: "#a855f7" },
+  { id: "DONE", label: "Completadas", color: "#10b981" },
+];
+
+export function getBucketColor(id: string): string {
+  const upper = id.toUpperCase();
+  if (upper.includes("BACKLOG")) return "#64748b";
+  if (upper.includes("TODO") || upper.includes("HACER") || upper.includes("SPRINT")) return "#0ea5e9";
+  if (upper.includes("PROGRESS") || upper.includes("PROGRESO")) return "#f59e0b";
+  if (upper.includes("REVIEW") || upper.includes("REVISION") || upper.includes("TEST")) return "#a855f7";
+  if (upper.includes("DONE") || upper.includes("COMPLET") || upper.includes("FINAL")) return "#10b981";
+  return "#00f28e";
+}
+
+export function getProjectBuckets(
+  customStatuses?: readonly CustomStatusOption[] | null
+): BucketOption[] {
+  if (customStatuses && customStatuses.length > 0) {
+    return customStatuses.map((s) => ({
+      id: s.id,
+      label: s.label,
+      color: s.color ?? getBucketColor(s.id),
+    }));
+  }
+  return [...DEFAULT_BUCKETS];
+}

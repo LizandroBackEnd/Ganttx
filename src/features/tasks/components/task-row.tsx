@@ -7,6 +7,7 @@ import { TaskPriorityBadge } from "./task-priority-badge";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { updateTaskStatus, deleteTask } from "../api/task-mutations";
 import { IconCheck, IconPencil, IconTrash, IconCrown } from "@tabler/icons-react";
+import { sileo } from "sileo";
 import type { TaskDTO, CustomStatusOption, CustomPriorityOption } from "../types/task.types";
 
 export interface TaskRowProps {
@@ -32,22 +33,49 @@ export function TaskRow({
 
   const handleStatusChange = async (newStatus: string): Promise<void> => {
     try {
-      await updateTaskStatus({ taskId: task.id, status: newStatus });
-      router.refresh();
+      const res = await updateTaskStatus({ taskId: task.id, status: newStatus });
+      if (res.success) {
+        sileo.success({
+          title: newStatus === "DONE" ? "Tarea completada" : "Estado actualizado",
+          description: `"${task.title}" se marcó como ${newStatus === "DONE" ? "completada" : newStatus}.`,
+        });
+        router.refresh();
+      } else {
+        sileo.error({
+          title: "Error al actualizar estado",
+          description: res.error,
+        });
+      }
     } catch {
-      // ignore
+      sileo.error({
+        title: "Error al actualizar estado",
+        description: "Ocurrió un error inesperado.",
+      });
     }
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar "${task.title}"?`)) {
-      return;
-    }
     try {
       setIsDeleting(true);
-      await deleteTask({ taskId: task.id });
+      const res = await deleteTask({ taskId: task.id });
+      if (res && !res.success) {
+        sileo.error({
+          title: "Error al eliminar tarea",
+          description: res.error,
+        });
+        setIsDeleting(false);
+        return;
+      }
+      sileo.success({
+        title: "Tarea eliminada",
+        description: `"${task.title}" se eliminó correctamente.`,
+      });
       router.refresh();
     } catch {
+      sileo.error({
+        title: "Error al eliminar tarea",
+        description: "Ocurrió un error inesperado al eliminar la tarea.",
+      });
       setIsDeleting(false);
     }
   };
