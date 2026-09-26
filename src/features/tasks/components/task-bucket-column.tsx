@@ -6,7 +6,7 @@ import { TaskCard } from "./task-card";
 import { TaskFormDialog, type ProjectMemberOption, type TaskEpicOption } from "./task-form-dialog";
 import { BucketConfigDialog } from "./bucket-config-dialog";
 import { Button } from "@/shared/components/ui/button";
-import { IconPlus, IconDots, IconSquarePlus, IconX } from "@tabler/icons-react";
+import { IconPlus, IconDots, IconSquarePlus, IconX, IconGripVertical } from "@tabler/icons-react";
 import { createTask } from "../api/task-mutations";
 import { sileo } from "sileo";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,11 @@ export interface TaskBucketColumnProps {
   readonly customPriorities?: readonly CustomPriorityOption[] | null;
   readonly canEdit?: boolean;
   readonly onTaskDrop: (taskId: string, targetBucketId: string) => void;
+  readonly onBucketReorder?: (
+    sourceBucketId: string,
+    targetBucketId: string,
+    side: "left" | "right"
+  ) => void;
   readonly onUpdateBucket?: (
     bucketId: string,
     updates: { label: string; color: string }
@@ -52,12 +57,15 @@ export function TaskBucketColumn({
   customPriorities,
   canEdit = true,
   onTaskDrop,
+  onBucketReorder,
   onUpdateBucket,
   onDeleteBucket,
   canDeleteBucket = false,
 }: TaskBucketColumnProps): React.JSX.Element {
   const router = useRouter();
   const [isOver, setIsOver] = useState<boolean>(false);
+  const [isBucketDragging, setIsBucketDragging] = useState<boolean>(false);
+  const [bucketDropIndicator, setBucketDropIndicator] = useState<"left" | "right" | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
 
   // Inline Task Creation state
@@ -69,21 +77,55 @@ export function TaskBucketColumn({
   const [createdTaskForModal, setCreatedTaskForModal] = useState<TaskDTO | undefined>(undefined);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
+  const handleBucketDragStart = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.stopPropagation();
+    e.dataTransfer.setData("application/x-bucket-id", bucket.id);
+    e.dataTransfer.effectAllowed = "move";
+    setIsBucketDragging(true);
+  };
+
+  const handleBucketDragEnd = (): void => {
+    setIsBucketDragging(false);
+  };
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    if (!isOver) setIsOver(true);
+
+    const isBucket = e.dataTransfer.types.includes("application/x-bucket-id");
+    if (isBucket) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      const side = e.clientX < midpoint ? "left" : "right";
+      setBucketDropIndicator(side);
+      if (isOver) setIsOver(false);
+    } else {
+      if (bucketDropIndicator) setBucketDropIndicator(null);
+      if (!isOver) setIsOver(true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>): void => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsOver(false);
+      setBucketDropIndicator(null);
     }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     setIsOver(false);
+    const side = bucketDropIndicator;
+    setBucketDropIndicator(null);
+
+    const draggedBucketId = e.dataTransfer.getData("application/x-bucket-id");
+    if (draggedBucketId) {
+      if (draggedBucketId !== bucket.id && onBucketReorder) {
+        onBucketReorder(draggedBucketId, bucket.id, side ?? "left");
+      }
+      return;
+    }
+
     const taskId = e.dataTransfer.getData("text/plain");
     if (taskId) {
       onTaskDrop(taskId, bucket.id);
@@ -196,14 +238,29 @@ export function TaskBucketColumn({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          "flex flex-col w-72 md:w-80 shrink-0 h-full max-h-full rounded-2xl border transition-all duration-200 overflow-hidden",
+          "flex flex-col w-72 md:w-80 shrink-0 h-full max-h-full rounded-2xl border transition-all duration-200 overflow-hidden relative",
           "bg-surface/50 border-border/80 shadow-xs",
-          isOver && "ring-2 ring-primary/60 border-primary bg-primary/4"
+          isBucketDragging && "opacity-40 scale-[0.98] border-dashed border-primary/50",
+          isOver && "ring-2 ring-primary/60 border-primary bg-primary/4",
+          bucketDropIndicator === "left" && "border-l-4 border-l-primary ring-2 ring-primary/40",
+          bucketDropIndicator === "right" && "border-r-4 border-r-primary ring-2 ring-primary/40"
         )}
       >
-        {/* Bucket Header: Title, Count, Settings (•••) */}
+        {/* Bucket Header: Drag Grip, Title, Count, Settings (•••) */}
         <div className="shrink-0 flex items-center justify-between p-3.5 border-b border-border/60 gap-2">
           <div className="flex items-center gap-2 min-w-0">
+            {canEdit && (
+              <div
+                draggable
+                onDragStart={handleBucketDragStart}
+                onDragEnd={handleBucketDragEnd}
+                className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-text-muted hover:text-text-primary rounded-md hover:bg-surface-elevated transition-colors shrink-0"
+                title="Arrastrar para mover bucket"
+                aria-label="Arrastrar para mover bucket"
+              >
+                <IconGripVertical className="size-3.5" />
+              </div>
+            )}
             <span
               className="size-2 rounded-full shrink-0"
               style={{ backgroundColor: bucketColor }}

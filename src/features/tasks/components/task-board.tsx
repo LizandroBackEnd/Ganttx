@@ -80,10 +80,15 @@ export function TaskBoard({
       )
   );
 
-  // Buckets derived from project customStatuses
-  const buckets = useMemo<BucketOption[]>(
+  // Buckets derived from project customStatuses with React 19 Optimistic state
+  const baseBuckets = useMemo<BucketOption[]>(
     () => getProjectBuckets(customStatuses),
     [customStatuses]
+  );
+
+  const [buckets, setOptimisticBuckets] = useOptimistic(
+    baseBuckets,
+    (_current: BucketOption[], next: BucketOption[]) => next
   );
 
   // Filters
@@ -142,6 +147,50 @@ export function TaskBoard({
         sileo.error({
           title: "Error al mover tarea",
           description: "No se pudo actualizar el estado de la tarea.",
+        });
+      }
+    });
+  };
+
+  // Handle Reorder Buckets
+  const handleBucketReorder = (
+    draggedBucketId: string,
+    targetBucketId: string,
+    side: "left" | "right"
+  ): void => {
+    if (draggedBucketId === targetBucketId) return;
+
+    const currentList = [...buckets];
+    const fromIndex = currentList.findIndex((b) => b.id === draggedBucketId);
+    if (fromIndex === -1) return;
+
+    const [movedBucket] = currentList.splice(fromIndex, 1);
+    let toIndex = currentList.findIndex((b) => b.id === targetBucketId);
+    if (toIndex === -1) return;
+
+    if (side === "right") {
+      toIndex += 1;
+    }
+    currentList.splice(toIndex, 0, movedBucket);
+
+    startTransition(async () => {
+      setOptimisticBuckets(currentList);
+      try {
+        const result = await updateProjectCustomOptions(projectId, {
+          customStatuses: currentList,
+        });
+        if (result.success) {
+          router.refresh();
+        } else {
+          sileo.error({
+            title: "Error al reordenar buckets",
+            description: result.error,
+          });
+        }
+      } catch {
+        sileo.error({
+          title: "Error al reordenar buckets",
+          description: "Ocurrió un error inesperado al mover el bucket.",
         });
       }
     });
@@ -518,6 +567,7 @@ export function TaskBoard({
                 customPriorities={customPriorities}
                 canEdit={canEdit}
                 onTaskDrop={handleTaskDrop}
+                onBucketReorder={handleBucketReorder}
                 onUpdateBucket={handleUpdateBucket}
                 onDeleteBucket={handleDeleteBucket}
                 canDeleteBucket={canEdit && buckets.length > 1}
