@@ -21,6 +21,7 @@ import {
 } from "@/shared/components/ui/select";
 import { cn } from "@/lib/utils";
 import { TaskStatusPriorityConfigDialog } from "./task-status-priority-config-dialog";
+import { TaskCommentsPanel } from "./task-comments-panel";
 import {
   createTask,
   updateTask,
@@ -49,6 +50,7 @@ export interface ProjectMemberOption {
   readonly id: string;
   readonly name: string | null;
   readonly email: string;
+  readonly image?: string | null;
 }
 
 export interface TaskEpicOption {
@@ -362,9 +364,11 @@ function TaskFormContent({
         </div>
       </DialogHeader>
 
-      <div className="py-4 flex flex-col gap-4">
-        {/* Tarea Maestra (EPIC) */}
-        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-5 flex-1">
+        {/* Columna Izquierda: Formulario principal de la tarea */}
+        <div className="lg:col-span-7 flex flex-col gap-4 h-full">
+          {/* Tarea Maestra (EPIC) */}
+          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <IconCrown className="size-4 text-purple-400" />
@@ -562,7 +566,7 @@ function TaskFormContent({
         </div>
 
         {/* Fila 4: Tabs de Descripción y Subtareas */}
-        <div className="flex flex-col pt-2 border-t border-border/40">
+        <div className="flex flex-col pt-2 border-t border-border/40 flex-1 min-h-0">
           {/* Tab Navigation matching image */}
           <div className="flex items-center gap-1 border-b border-border">
             <button
@@ -598,10 +602,9 @@ function TaskFormContent({
 
           {/* Tab 1: Descripción */}
           {activeTab === "description" && (
-            <div className="pt-3">
+            <div className="pt-3 flex-1 flex flex-col min-h-0">
               <textarea
                 id="task-description"
-                rows={4}
                 placeholder="Agrega una descripción detallada o notas..."
                 value={description}
                 onChange={(e) => {
@@ -613,7 +616,7 @@ function TaskFormContent({
                   triggerImmediateSave({ description: description.trim() || null });
                 }}
                 maxLength={2000}
-                className="w-full rounded-xl border border-border bg-background p-3 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+                className="w-full flex-1 min-h-48 rounded-xl border border-border bg-background p-3.5 text-xs text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none resize-none leading-relaxed"
               />
             </div>
           )}
@@ -748,8 +751,19 @@ function TaskFormContent({
           )}
         </div>
       </div>
-    </>
-  );
+
+      {/* Columna Derecha: Panel Lateral de Comentarios */}
+      <div className="lg:col-span-5 flex flex-col border-t lg:border-t-0 lg:border-l border-border/60 pt-6 lg:pt-0 lg:pl-8 h-full">
+        <TaskCommentsPanel
+          taskId={currentTask?.id}
+          projectId={projectId}
+          task={currentTask}
+          members={members}
+        />
+      </div>
+    </div>
+  </>
+);
 }
 
 export function TaskFormDialog({
@@ -790,7 +804,7 @@ export function TaskFormDialog({
     <>
       <Dialog open={isOpen} onOpenChange={setOpen}>
         {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-        <DialogContent className="border-border bg-surface sm:max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="border-border bg-surface w-[95vw] sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl min-h-[85vh] max-h-[94vh] overflow-y-auto p-6 sm:p-8 flex flex-col">
           {isOpen && (
             <TaskFormContent
               key={initialTask?.id ?? "new-task"}

@@ -27,6 +27,7 @@ export default async function ProjectPage({
     id: m.userId,
     name: m.name,
     email: m.email,
+    image: m.image,
   }));
 
   return (

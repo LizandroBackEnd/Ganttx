@@ -54,6 +54,23 @@ export interface SubtaskDTO {
   readonly assignee: TaskAssigneeDTO | null;
 }
 
+export interface TaskCommentAuthorDTO {
+  readonly id: string;
+  readonly name: string | null;
+  readonly email: string;
+  readonly image: string | null;
+}
+
+export interface TaskCommentDTO {
+  readonly id: string;
+  readonly content: string;
+  readonly taskId: string;
+  readonly authorId: string;
+  readonly author: TaskCommentAuthorDTO;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export type ActionSuccess<T = void> = {
   readonly success: true;
   readonly data: T;
@@ -133,6 +150,14 @@ export const deleteTaskSchema = z.object({
 });
 
 export type DeleteTaskInput = z.infer<typeof deleteTaskSchema>;
+
+export const createTaskCommentSchema = z.object({
+  taskId: z.string().uuid("ID de tarea inválido"),
+  projectId: z.string().uuid("ID de proyecto inválido"),
+  content: z.string().trim().min(1, "El comentario no puede estar vacío").max(5000, "El comentario no puede exceder 5000 caracteres"),
+});
+
+export type CreateTaskCommentInput = z.infer<typeof createTaskCommentSchema>;
 
 export interface BucketOption {
   readonly id: string;

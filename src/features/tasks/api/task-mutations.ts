@@ -10,6 +10,7 @@ import {
   updateTaskDatesSchema,
   updateTaskStatusSchema,
   deleteTaskSchema,
+  createTaskCommentSchema,
   type TaskActionResult,
   type TaskDTO,
   type CreateTaskInput,
@@ -17,6 +18,8 @@ import {
   type UpdateTaskDatesInput,
   type UpdateTaskStatusInput,
   type DeleteTaskInput,
+  type CreateTaskCommentInput,
+  type TaskCommentDTO,
   type CustomStatusOption,
   type CustomPriorityOption,
   type SubtaskDTO,
@@ -580,3 +583,143 @@ export async function deleteSubtask(
     return { success: false, error: "Error al eliminar la subtarea" };
   }
 }
+
+export async function getTaskComments(
+  taskId: string
+): Promise<TaskActionResult<TaskCommentDTO[]>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  try {
+    const comments = await prisma.taskComment.findMany({
+      where: { taskId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        content: true,
+        taskId: true,
+        authorId: true,
+        createdAt: true,
+        updatedAt: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: comments.map((c) => ({
+        id: c.id,
+        content: c.content,
+        taskId: c.taskId,
+        authorId: c.authorId,
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
+        author: {
+          id: c.author.id,
+          name: c.author.name,
+          email: c.author.email,
+          image: c.author.image,
+        },
+      })),
+    };
+  } catch {
+    return { success: false, error: "Error al cargar los comentarios" };
+  }
+}
+
+export async function createTaskComment(
+  input: CreateTaskCommentInput
+): Promise<TaskActionResult<TaskCommentDTO>> {
+  const parsed = createTaskCommentSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Error de validación",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { taskId, projectId, content } = parsed.data;
+
+  const member = await prisma.projectMember.findUnique({
+    where: {
+      userId_projectId: {
+        userId: session.user.id,
+        projectId,
+      },
+    },
+    select: { role: true },
+  });
+
+  if (!member) {
+    return { success: false, error: "No tienes permiso para comentar en esta tarea" };
+  }
+
+  try {
+    const comment = await prisma.taskComment.create({
+      data: {
+        content,
+        taskId,
+        authorId: session.user.id,
+      },
+      select: {
+        id: true,
+        content: true,
+        taskId: true,
+        authorId: true,
+        createdAt: true,
+        updatedAt: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    projectEvents.emit(projectId, "task:updated", { taskId }, session.user.id);
+
+    return {
+      success: true,
+      data: {
+        id: comment.id,
+        content: comment.content,
+        taskId: comment.taskId,
+        authorId: comment.authorId,
+        createdAt: comment.createdAt.toISOString(),
+        updatedAt: comment.updatedAt.toISOString(),
+        author: {
+          id: comment.author.id,
+          name: comment.author.name,
+          email: comment.author.email,
+          image: comment.author.image,
+        },
+      },
+    };
+  } catch (err) {
+    console.error("Error creating task comment:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Error al publicar el comentario",
+    };
+  }
+}
+
+
