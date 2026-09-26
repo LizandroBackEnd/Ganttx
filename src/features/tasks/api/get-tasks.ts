@@ -63,6 +63,8 @@ export async function getTasksByProjectId(
         select: {
           id: true,
           title: true,
+          startDate: true,
+          dueDate: true,
         },
       },
       _count: {
@@ -75,6 +77,7 @@ export async function getTasksByProjectId(
           id: true,
           title: true,
           bucket: true,
+          showSubtasksOnCard: true,
           assigneeId: true,
           assignee: {
             select: {
@@ -125,6 +128,7 @@ export async function getTasksByProjectId(
       id: st.id,
       title: st.title,
       bucket: st.bucket,
+      showSubtasksOnCard: st.showSubtasksOnCard,
       assigneeId: st.assigneeId,
       assignee: st.assignee
         ? {
@@ -140,6 +144,8 @@ export async function getTasksByProjectId(
       ? {
           id: t.parent.id,
           title: t.parent.title,
+          startDate: formatLocalDateToIsoString(t.parent.startDate),
+          dueDate: formatLocalDateToIsoString(t.parent.dueDate),
         }
       : null,
     subtasksCount: t._count.subtasks,
@@ -185,6 +191,8 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
         select: {
           id: true,
           title: true,
+          startDate: true,
+          dueDate: true,
         },
       },
       _count: {
@@ -197,6 +205,7 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
           id: true,
           title: true,
           bucket: true,
+          showSubtasksOnCard: true,
           assigneeId: true,
           assignee: {
             select: {
@@ -254,6 +263,7 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
       id: st.id,
       title: st.title,
       bucket: st.bucket,
+      showSubtasksOnCard: st.showSubtasksOnCard,
       assigneeId: st.assigneeId,
       assignee: st.assignee
         ? {
@@ -269,6 +279,8 @@ export async function getTaskById(taskId: string): Promise<TaskDTO | null> {
       ? {
           id: task.parent.id,
           title: task.parent.title,
+          startDate: formatLocalDateToIsoString(task.parent.startDate),
+          dueDate: formatLocalDateToIsoString(task.parent.dueDate),
         }
       : null,
     subtasksCount: task._count.subtasks,

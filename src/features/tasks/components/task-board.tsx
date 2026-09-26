@@ -112,6 +112,10 @@ export function TaskBoard({
   // Filter tasks based on search and filters
   const filteredTasks = useMemo(() => {
     return optimisticTasks.filter((task) => {
+      // Subtasks are only rendered as cards in the buckets if showSubtasksOnCard is true
+      const isCardInBuckets = !task.parentId || Boolean(task.showSubtasksOnCard);
+      if (!isCardInBuckets) return false;
+
       const matchesSearch =
         !searchQuery.trim() ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -60,8 +60,12 @@ export function TaskTable({
     ];
   }, [customStatuses]);
 
+  const cardTasks = useMemo(() => {
+    return tasks.filter((task) => !task.parentId || Boolean(task.showSubtasksOnCard));
+  }, [tasks]);
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter((task) => {
+    return cardTasks.filter((task) => {
       const matchesTab =
         activeTab === "ALL" ||
         (activeTab === "DONE"
@@ -73,7 +77,7 @@ export function TaskTable({
         task.description?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesTab && matchesSearch;
     });
-  }, [tasks, activeTab, searchQuery]);
+  }, [cardTasks, activeTab, searchQuery]);
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden">
@@ -84,8 +88,8 @@ export function TaskTable({
           {filterTabs.map((tab) => {
             const count =
               tab.id === "ALL"
-                ? tasks.length
-                : tasks.filter((t) =>
+                ? cardTasks.length
+                : cardTasks.filter((t) =>
                     tab.id === "DONE"
                       ? isTaskDone(t.bucket)
                       : getTaskBucketId(t.bucket) === tab.id

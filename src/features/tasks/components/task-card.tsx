@@ -458,6 +458,10 @@ export function TaskCard({
             customPriorities={customPriorities}
             isOpen={isEditDialogOpen}
             onOpenChange={setIsEditDialogOpen}
+            isSubtask={Boolean(task.parentId)}
+            parentTitle={task.parent?.title}
+            parentStartDate={task.parent?.startDate}
+            parentDueDate={task.parent?.dueDate}
           />
         )}
       </>
@@ -780,6 +784,10 @@ export function TaskCard({
         customPriorities={customPriorities}
         isOpen={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
+        isSubtask={Boolean(task.parentId)}
+        parentTitle={task.parent?.title}
+        parentStartDate={task.parent?.startDate}
+        parentDueDate={task.parent?.dueDate}
         onTaskCreatedOrUpdated={() => {
           setSubtaskOverrides({});
           router.refresh();

@@ -41,6 +41,7 @@ import {
   IconLoader2,
   IconX,
   IconExternalLink,
+  IconLayoutKanban,
 } from "@tabler/icons-react";
 import { sileo } from "sileo";
 import {
@@ -157,6 +158,8 @@ function TaskFormContent({
   const isSubtask = Boolean(
     isSubtaskProp || initialTask?.parentId || currentTask?.parentId
   );
+  const effectiveParentTitle =
+    parentTitle || initialTask?.parent?.title || currentTask?.parent?.title;
   const effectiveParentStartDate =
     parentStartDate || initialTask?.parent?.startDate || currentTask?.parent?.startDate;
   const effectiveParentDueDate =
@@ -192,11 +195,13 @@ function TaskFormContent({
   // Subtasks state
   const [subtasks, setSubtasks] = useState<SubtaskDTO[]>([]);
   const [activeTab, setActiveTab] = useState<"description" | "subtasks">("description");
+  const currentActiveTab = isSubtask ? "description" : activeTab;
   const [isAddingSubtask, setIsAddingSubtask] = useState<boolean>(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState<string>("");
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState<string>("");
   const [newSubtaskLabels, setNewSubtaskLabels] = useState<string[]>([]);
   const [isSavingSubtask, setIsSavingSubtask] = useState<boolean>(false);
+
 
   // Subtask modal state
   const [subtaskModalTask, setSubtaskModalTask] = useState<TaskDTO | null>(null);
@@ -419,6 +424,76 @@ function TaskFormContent({
     }
   };
 
+  const handleToggleShowAsCardInBuckets = (checked: boolean): void => {
+    setShowSubtasksOnCard(checked);
+    triggerImmediateSave({ showSubtasksOnCard: checked });
+    const updatedDto = {
+      ...(currentTask ?? initialTask!),
+      showSubtasksOnCard: checked,
+    } as TaskDTO;
+    setCurrentTask(updatedDto);
+    onTaskCreatedOrUpdated?.(updatedDto);
+    if (checked) {
+      sileo.success({
+        title: "Tarjeta en buckets activada",
+        description: `"${title.trim() || "La subtarea"}" ahora se muestra como una tarjeta en los buckets.`,
+      });
+    } else {
+      sileo.info({
+        title: "Tarjeta en buckets desactivada",
+        description: `"${title.trim() || "La subtarea"}" ya no se muestra como tarjeta en el tablero.`,
+      });
+    }
+    router.refresh();
+  };
+
+  const handleToggleSubtaskCardVisibility = async (
+    subtaskId: string,
+    currentVisibility: boolean
+  ): Promise<void> => {
+    const nextVisibility = !currentVisibility;
+    try {
+      const res = await updateTask({
+        taskId: subtaskId,
+        showSubtasksOnCard: nextVisibility,
+      });
+
+      if (res.success) {
+        const nextSubtasks = subtasks.map((s) =>
+          s.id === subtaskId ? { ...s, showSubtasksOnCard: nextVisibility } : s
+        );
+        setSubtasks(nextSubtasks);
+        onTaskCreatedOrUpdated?.({
+          ...(currentTask ?? initialTask!),
+          subtasks: nextSubtasks,
+        });
+
+        if (nextVisibility) {
+          sileo.success({
+            title: "Tarjeta en buckets activada",
+            description: "La subtarea ahora se muestra como una tarjeta en el tablero.",
+          });
+        } else {
+          sileo.info({
+            title: "Tarjeta en buckets desactivada",
+            description: "La subtarea ya no se muestra como tarjeta en el tablero.",
+          });
+        }
+        router.refresh();
+      } else {
+        sileo.error({
+          title: "Error al actualizar subtarea",
+          description: res.error,
+        });
+      }
+    } catch {
+      sileo.error({
+        title: "Error al actualizar subtarea",
+        description: "No se pudo actualizar la visibilidad en el tablero.",
+      });
+    }
+  };
+
   // Send update or create on server
   const persistChanges = useCallback(
     async (updates: Partial<UpdateTaskInput>): Promise<void> => {
@@ -592,18 +667,30 @@ function TaskFormContent({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-5 flex-1">
         {/* Columna Izquierda: Formulario principal de la tarea */}
         <div className="lg:col-span-7 flex flex-col gap-4 h-full">
-          {/* Si es una subtarea, muestra únicamente a qué tarea pertenece. En caso contrario, muestra la sección de EPIC */}
+          {/* Si es una subtarea, muestra a qué tarea pertenece y el switch para mostrarla como tarjeta en los buckets. En caso contrario, muestra la sección de EPIC */}
           {isSubtask ? (
-            <div className="rounded-xl border border-border/60 bg-surface-elevated/40 px-3.5 py-2.5 flex items-center justify-between gap-2">
+            <div className="rounded-xl border border-border/60 bg-surface-elevated/40 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+                  Subtarea
+                </span>
                 <span className="text-xs text-text-muted shrink-0">Pertenece a la tarea:</span>
                 <span className="text-xs font-semibold text-text-primary truncate">
-                  {currentTask?.parent?.title || initialTask?.parent?.title || parentTitle || "Tarea principal"}
+                  {effectiveParentTitle || "Tarea principal"}
                 </span>
               </div>
-              <span className="text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
-                Subtarea
-              </span>
+
+              <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto bg-surface/60 border border-border/60 rounded-xl px-3 py-1.5">
+                <IconLayoutKanban className="size-4 text-primary" />
+                <span className="text-xs text-text-secondary font-medium select-none">
+                  Hacer tarjeta en los buckets
+                </span>
+                <Switch
+                  checked={showSubtasksOnCard}
+                  onCheckedChange={handleToggleShowAsCardInBuckets}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex flex-col gap-2">
@@ -813,34 +900,36 @@ function TaskFormContent({
               onClick={() => setActiveTab("description")}
               className={cn(
                 "px-4 py-2 text-xs transition-colors cursor-pointer -mb-px",
-                activeTab === "description"
+                currentActiveTab === "description"
                   ? "rounded-t-lg border border-b-0 border-border bg-surface text-text-primary font-semibold"
                   : "text-text-muted hover:text-text-primary font-medium"
               )}
             >
               Descripción
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("subtasks")}
-              className={cn(
-                "px-4 py-2 text-xs transition-colors cursor-pointer -mb-px flex items-center gap-1.5",
-                activeTab === "subtasks"
-                  ? "rounded-t-lg border border-b-0 border-border bg-surface text-text-primary font-semibold"
-                  : "text-text-muted hover:text-text-primary font-medium"
-              )}
-            >
-              <span>Subtareas</span>
-              {subtasks.length > 0 && (
-                <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
-                  {subtasks.length}
-                </span>
-              )}
-            </button>
+            {!isSubtask && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("subtasks")}
+                className={cn(
+                  "px-4 py-2 text-xs transition-colors cursor-pointer -mb-px flex items-center gap-1.5",
+                  currentActiveTab === "subtasks"
+                    ? "rounded-t-lg border border-b-0 border-border bg-surface text-text-primary font-semibold"
+                    : "text-text-muted hover:text-text-primary font-medium"
+                )}
+              >
+                <span>Subtareas</span>
+                {subtasks.length > 0 && (
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                    {subtasks.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Tab 1: Descripción */}
-          {activeTab === "description" && (
+          {currentActiveTab === "description" && (
             <div className="pt-3 flex-1 flex flex-col min-h-0">
               <textarea
                 id="task-description"
@@ -861,7 +950,7 @@ function TaskFormContent({
           )}
 
           {/* Tab 2: Subtareas (matching attached image) */}
-          {activeTab === "subtasks" && (
+          {!isSubtask && currentActiveTab === "subtasks" && (
             <div className="flex flex-col pt-1">
               {/* Switch para mostrar checklist en la tarjeta */}
               <div className="flex items-center justify-between px-3 py-2 mb-2 rounded-xl bg-surface-elevated/40 border border-border/50">
@@ -932,6 +1021,23 @@ function TaskFormContent({
                         {st.assignee?.name || st.assignee?.email || "Sin asignar"}
                       </span>
                       <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleSubtaskCardVisibility(st.id, Boolean(st.showSubtasksOnCard))}
+                          className={cn(
+                            "p-1 rounded-md transition-all cursor-pointer",
+                            st.showSubtasksOnCard
+                              ? "text-primary bg-primary/10 border border-primary/25 opacity-100"
+                              : "opacity-0 group-hover:opacity-100 text-text-muted hover:text-primary hover:bg-surface-elevated"
+                          )}
+                          title={
+                            st.showSubtasksOnCard
+                              ? "Mostrada como tarjeta en los buckets (clic para ocultar del tablero)"
+                              : "Hacer tarjeta en los buckets (mostrar en el tablero)"
+                          }
+                        >
+                          <IconLayoutKanban className="size-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => void handleOpenSubtaskModal(st.id)}
@@ -1102,6 +1208,7 @@ function TaskFormContent({
                     label: updatedTask.label,
                     assigneeId: updatedTask.assigneeId,
                     assignee: updatedTask.assignee,
+                    showSubtasksOnCard: updatedTask.showSubtasksOnCard,
                   }
                 : s
             )
@@ -1128,12 +1235,16 @@ export function TaskFormDialog({
   isOpen: isOpenAlias,
   onOpenChange: onOpenChangeAlias,
   onTaskCreatedOrUpdated,
-  isSubtask,
-  parentTitle,
-  parentStartDate,
-  parentDueDate,
+  isSubtask: isSubtaskProp,
+  parentTitle: parentTitleProp,
+  parentStartDate: parentStartDateProp,
+  parentDueDate: parentDueDateProp,
 }: TaskFormDialogProps): React.JSX.Element {
   const initialTask = taskAlias ?? taskToEdit;
+  const isSubtask = Boolean(isSubtaskProp || initialTask?.parentId);
+  const parentTitle = parentTitleProp || initialTask?.parent?.title;
+  const parentStartDate = parentStartDateProp || initialTask?.parent?.startDate;
+  const parentDueDate = parentDueDateProp || initialTask?.parent?.dueDate;
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
   const effectiveIsOpen = isOpenAlias !== undefined ? isOpenAlias : isOpenControlled;
   const effectiveOnOpenChange = onOpenChangeAlias !== undefined ? onOpenChangeAlias : onOpenChangeControlled;

@@ -561,6 +561,7 @@ export async function getSubtasks(
         title: true,
         bucket: true,
         label: true,
+        showSubtasksOnCard: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -581,6 +582,7 @@ export async function getSubtasks(
         title: s.title,
         bucket: s.bucket,
         label: s.label,
+        showSubtasksOnCard: s.showSubtasksOnCard,
         assigneeId: s.assigneeId,
         assignee: s.assignee,
       })),
@@ -635,6 +637,7 @@ export async function createSubtask(input: {
         title: true,
         bucket: true,
         label: true,
+        showSubtasksOnCard: true,
         assigneeId: true,
         assignee: {
           select: {
@@ -656,6 +659,7 @@ export async function createSubtask(input: {
         title: subtask.title,
         bucket: subtask.bucket,
         label: subtask.label,
+        showSubtasksOnCard: subtask.showSubtasksOnCard,
         assigneeId: subtask.assigneeId,
         assignee: subtask.assignee,
       },
@@ -738,6 +742,7 @@ export async function getTaskDetails(
             title: true,
             bucket: true,
             label: true,
+            showSubtasksOnCard: true,
             assigneeId: true,
             assignee: {
               select: {
@@ -796,6 +801,7 @@ export async function getTaskDetails(
         title: st.title,
         bucket: st.bucket,
         label: st.label,
+        showSubtasksOnCard: st.showSubtasksOnCard,
         assigneeId: st.assigneeId,
         assignee: st.assignee,
       })),

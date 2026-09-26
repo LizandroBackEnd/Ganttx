@@ -56,6 +56,7 @@ export interface SubtaskDTO {
   readonly title: string;
   readonly bucket: string;
   readonly label?: string;
+  readonly showSubtasksOnCard?: boolean;
   readonly assigneeId: string | null;
   readonly assignee: TaskAssigneeDTO | null;
 }
