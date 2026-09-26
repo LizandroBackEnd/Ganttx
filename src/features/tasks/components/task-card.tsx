@@ -539,12 +539,6 @@ export function TaskCard({
           </div>
         </div>
 
-        {/* Description snippet if present */}
-        {task.description && (
-          <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed">
-            {task.description}
-          </p>
-        )}
 
         {/* Badges / Tags row */}
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
