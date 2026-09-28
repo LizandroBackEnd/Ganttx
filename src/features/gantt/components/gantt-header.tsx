@@ -30,14 +30,14 @@ export function GanttHeader({
   }
 
   return (
-    <div className="sticky top-0 z-20 flex flex-col border-b border-border bg-surface select-none">
+    <div className="h-full flex flex-col bg-surface select-none">
       {/* Month row */}
-      <div className="flex border-b border-border/60 bg-surface-elevated/50 text-[11px] font-semibold text-text-secondary">
+      <div className="h-7 flex items-center border-b border-border/60 bg-surface-elevated/50 text-[11px] font-semibold text-text-secondary">
         {monthGroups.map((group, idx) => (
           <div
             key={`${group.monthName}-${idx}`}
             style={{ width: `${group.count * columnWidthPx}px` }}
-            className="border-r border-border/40 px-2 py-1 truncate"
+            className="border-r border-border/40 px-2 truncate leading-none"
           >
             {group.monthName}
           </div>
@@ -45,12 +45,12 @@ export function GanttHeader({
       </div>
 
       {/* Days row */}
-      <div className="flex text-[10px] font-mono text-text-muted">
+      <div className="h-9 flex text-[10px] font-mono text-text-muted">
         {columns.map((col) => (
           <div
             key={col.dateString}
             style={{ width: `${columnWidthPx}px` }}
-            className={`flex flex-col items-center justify-center border-r border-border/30 py-1.5 ${
+            className={`flex flex-col items-center justify-center border-r border-border/30 ${
               col.isToday
                 ? "bg-primary/10 text-primary font-bold"
                 : col.isWeekend
@@ -58,8 +58,8 @@ export function GanttHeader({
                 : ""
             }`}
           >
-            <span>{col.dayNumber}</span>
-            <span className="text-[9px] uppercase text-text-muted/70">{col.dayName[0]}</span>
+            <span className="leading-tight">{col.dayNumber}</span>
+            <span className="text-[9px] uppercase text-text-muted/70 leading-tight">{col.dayName[0]}</span>
           </div>
         ))}
       </div>

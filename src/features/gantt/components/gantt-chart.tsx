@@ -38,10 +38,21 @@ export interface GanttChartProps {
 }
 
 const COLUMN_WIDTH_PX = 36;
-const ROW_HEIGHT_PX = 42;
+const ROW_HEIGHT_PX = 44;
+const HEADER_HEIGHT_PX = 65;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 620;
 const DEFAULT_SIDEBAR_WIDTH = 320;
+
+const MIN_COL_WIDTH = 40;
+const MAX_COL_WIDTH = 200;
+
+interface ColWidths {
+  start: number;
+  due: number;
+  assignee: number;
+  predecessor: number;
+}
 
 function formatLocalDateToIsoString(date: Date): string {
   const year = date.getFullYear();
@@ -115,9 +126,15 @@ export function GanttChart({
   onToggleFullscreen,
 }: GanttChartProps): React.JSX.Element {
   const [selectedTask, setSelectedTask] = useState<TaskDTO | null>(null);
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [colWidths, setColWidths] = useState<ColWidths>({
+    start: 56,
+    due: 56,
+    assignee: 64,
+    predecessor: 64,
+  });
   const [collapsedEpics, setCollapsedEpics] = useState<Set<string>>(new Set());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
 
   const { dragState, startDrag } = useGanttDrag({
@@ -265,7 +282,7 @@ export function GanttChart({
     return arrows;
   }, [visibleTasks, taskMap, timelineStartIso]);
 
-  // ── Sidebar resize drag ───────────────────────────────────────────────
+  // ── Sidebar total-width resize ────────────────────────────────────────
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -293,6 +310,32 @@ export function GanttChart({
       window.addEventListener("mouseup", onMouseUp);
     },
     [sidebarWidth]
+  );
+
+  // ── Per-column resize factory ─────────────────────────────────────────
+  const makeColResizeHandler = useCallback(
+    (col: keyof ColWidths) =>
+      (e: React.MouseEvent<HTMLDivElement>): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startW = colWidths[col];
+
+        const onMove = (ev: MouseEvent): void => {
+          const next = Math.min(
+            MAX_COL_WIDTH,
+            Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX)
+          );
+          setColWidths((prev) => ({ ...prev, [col]: next }));
+        };
+        const onUp = (): void => {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+      },
+    [colWidths]
   );
 
   // ── Empty state ───────────────────────────────────────────────────────
@@ -372,26 +415,146 @@ export function GanttChart({
         </div>
       </div>
 
-      {/* Chart body */}
-      <div className="flex divide-x divide-border flex-1 min-h-0 overflow-hidden">
-        {/* ── Left fixed sidebar ─────────────────────────────────────── */}
+      {/* Chart body: single 2D scroll container where each row wraps both sidebar and timeline */}
+      <div className="flex-1 min-h-0 overflow-auto relative bg-surface/30">
         <div
-          style={{ width: `${sidebarWidth}px` }}
-          className="shrink-0 flex flex-col bg-surface-elevated/30 z-20 relative"
+          style={{
+            width: `${sidebarWidth + timelineWidthPx}px`,
+            minWidth: `${sidebarWidth + timelineWidthPx}px`,
+          }}
+          className="relative flex flex-col"
         >
-          {/* Sidebar header row */}
-          <div className="h-[65px] border-b border-border flex items-end bg-surface-elevated/50 shrink-0">
-            <div className="flex w-full text-[10px] font-semibold text-text-secondary uppercase tracking-wider px-2 pb-1 gap-1">
-              <span className="flex-1 min-w-0 truncate">Actividad</span>
-              <span className="w-14 shrink-0 text-center">Inicio</span>
-              <span className="w-14 shrink-0 text-center">Fin</span>
-              <span className="w-16 shrink-0 text-center">Asignado</span>
-              <span className="w-16 shrink-0 text-right pr-1">Predecesor</span>
+          {/* ── Fixed sticky header (Month/Day timescale + column headers) ── */}
+          <div
+            style={{ height: `${HEADER_HEIGHT_PX}px` }}
+            className="sticky top-0 z-30 flex border-b border-border bg-surface shrink-0 select-none"
+          >
+            {/* Left header: Actividad, Inicio, Fin, Asignado, Predecesor (sticky left-0) */}
+            <div
+              style={{ width: `${sidebarWidth}px` }}
+              className="sticky left-0 z-40 bg-surface border-r border-border shrink-0 flex items-end"
+            >
+              <div className="flex w-full text-[10px] font-semibold text-text-secondary uppercase tracking-wider pb-1.5 overflow-hidden">
+                {/* Activity — flex-1 */}
+                <span className="flex-1 min-w-0 truncate pl-2">Actividad</span>
+
+                {/* Resizable column headers */}
+                {(
+                  [
+                    ["start", "Inicio", "text-center"],
+                    ["due", "Fin", "text-center"],
+                    ["assignee", "Asignado", "text-center"],
+                    ["predecessor", "Predecesor", "text-right pr-2"],
+                  ] as const
+                ).map(([key, label, align]) => (
+                  <div
+                    key={key}
+                    style={{ width: `${colWidths[key]}px` }}
+                    className="relative shrink-0 group/col"
+                  >
+                    <span className={cn("block truncate", align)}>{label}</span>
+                    {/* Drag handle */}
+                    <div
+                      onMouseDown={makeColResizeHandler(key)}
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize flex items-center justify-center opacity-0 group-hover/col:opacity-100 transition-opacity z-10"
+                    >
+                      <div className="w-px h-3 bg-border group-hover/col:bg-primary/60 transition-colors" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sidebar total-width resize handle */}
+              <div
+                onMouseDown={handleResizeMouseDown}
+                className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors z-50 group flex items-center justify-center"
+                title="Arrastra para redimensionar panel"
+              >
+                <div className="w-1 h-6 rounded-full bg-border group-hover:bg-primary/60 transition-colors" />
+              </div>
+            </div>
+
+            {/* Right header: Timescale (Month + Day columns) */}
+            <div style={{ width: `${timelineWidthPx}px` }} className="shrink-0 h-full">
+              <GanttHeader columns={columns} columnWidthPx={COLUMN_WIDTH_PX} />
             </div>
           </div>
 
-          {/* Sidebar rows */}
-          <div className="flex flex-col divide-y divide-border/30 overflow-y-hidden">
+          {/* ── Rows container with background grid & arrows ── */}
+          <div className="relative flex flex-col divide-y divide-border/30">
+            {/* Background vertical day grid lines */}
+            <div
+              className="absolute top-0 bottom-0 flex pointer-events-none"
+              style={{
+                left: `${sidebarWidth}px`,
+                width: `${timelineWidthPx}px`,
+              }}
+            >
+              {columns.map((col) => (
+                <div
+                  key={`grid-${col.dateString}`}
+                  style={{ width: `${COLUMN_WIDTH_PX}px` }}
+                  className={cn(
+                    "border-r border-border/20 h-full shrink-0",
+                    col.isToday
+                      ? "bg-primary/5 ring-1 ring-inset ring-primary/20"
+                      : col.isWeekend
+                      ? "bg-background/20"
+                      : ""
+                  )}
+                />
+              ))}
+            </div>
+
+            {/* Predecessor arrows SVG overlay */}
+            {predecessorArrows.length > 0 && (
+              <svg
+                className="absolute pointer-events-none z-20"
+                style={{
+                  left: `${sidebarWidth}px`,
+                  top: 0,
+                  width: `${timelineWidthPx}px`,
+                  height: `${visibleTasks.length * ROW_HEIGHT_PX}px`,
+                }}
+                overflow="visible"
+              >
+                <defs>
+                  <marker
+                    id="arrow-head"
+                    markerWidth="6"
+                    markerHeight="6"
+                    refX="5"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <path
+                      d="M0,0 L0,6 L6,3 z"
+                      fill="rgba(148,163,184,0.7)"
+                    />
+                  </marker>
+                </defs>
+                {predecessorArrows.map((arrow) => {
+                  const midX = (arrow.fromX + arrow.toX) / 2;
+                  const path =
+                    arrow.fromY === arrow.toY
+                      ? `M${arrow.fromX},${arrow.fromY} L${arrow.toX},${arrow.toY}`
+                      : `M${arrow.fromX},${arrow.fromY} C${midX},${arrow.fromY} ${midX},${arrow.toY} ${arrow.toX},${arrow.toY}`;
+                  return (
+                    <path
+                      key={`${arrow.fromTaskId}-${arrow.toTaskId}`}
+                      d={path}
+                      fill="none"
+                      stroke="rgba(148,163,184,0.55)"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 3"
+                      markerEnd="url(#arrow-head)"
+                    />
+                  );
+                })}
+              </svg>
+            )}
+
+            {/* Rows: Each row wraps both left columns and right timeline cell */}
             {visibleTasks.map((task) => {
               const isCollapsed = task.isEpic && collapsedEpics.has(task.id);
               const hasChildren =
@@ -406,173 +569,117 @@ export function GanttChart({
                 <div
                   key={task.id}
                   style={{ height: `${ROW_HEIGHT_PX}px` }}
+                  onMouseEnter={() => setHoveredTaskId(task.id)}
+                  onMouseLeave={() => setHoveredTaskId(null)}
                   className={cn(
-                    "flex items-center px-2 gap-1 text-left transition-colors",
+                    "group flex transition-colors",
                     task.isEpic
-                      ? "bg-purple-500/5 hover:bg-purple-500/12 border-l-2 border-l-purple-500"
-                      : task.parentId
-                      ? "pl-5 hover:bg-surface-elevated/60"
-                      : "hover:bg-surface-elevated/60"
+                      ? hoveredTaskId === task.id
+                        ? "bg-purple-500/15"
+                        : "bg-purple-500/5 hover:bg-purple-500/10"
+                      : hoveredTaskId === task.id
+                      ? "bg-primary/8"
+                      : "hover:bg-surface-elevated/40"
                   )}
                 >
-                  {/* Collapse toggle for epics */}
-                  {task.isEpic && hasChildren ? (
+                  {/* Left column (sticky left-0) */}
+                  <div
+                    style={{ width: `${sidebarWidth}px` }}
+                    className={cn(
+                      "sticky left-0 z-10 shrink-0 flex items-center px-2 gap-1 text-left border-r border-border transition-colors",
+                      task.isEpic
+                        ? hoveredTaskId === task.id
+                          ? "bg-purple-950/40 border-l-2 border-l-purple-500"
+                          : "bg-surface/95 border-l-2 border-l-purple-500 group-hover:bg-purple-950/20"
+                        : task.parentId
+                        ? hoveredTaskId === task.id
+                          ? "bg-surface-elevated pl-5"
+                          : "bg-surface pl-5 group-hover:bg-surface-elevated"
+                        : hoveredTaskId === task.id
+                        ? "bg-surface-elevated"
+                        : "bg-surface group-hover:bg-surface-elevated"
+                    )}
+                  >
+                    {/* Collapse toggle for epics */}
+                    {task.isEpic && hasChildren ? (
+                      <button
+                        type="button"
+                        className="shrink-0 text-purple-400 hover:text-purple-300 transition-transform"
+                        style={{
+                          transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
+                        }}
+                        onClick={() => toggleEpicCollapse(task.id)}
+                      >
+                        <IconChevronRight className="size-3" />
+                      </button>
+                    ) : task.isEpic ? (
+                      <IconCrown className="size-3 text-purple-400 shrink-0" />
+                    ) : (
+                      <span className="size-3 shrink-0" />
+                    )}
+
+                    {/* Activity name */}
                     <button
                       type="button"
-                      className="shrink-0 text-purple-400 hover:text-purple-300 transition-transform"
-                      style={{
-                        transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
-                      }}
-                      onClick={() => toggleEpicCollapse(task.id)}
+                      className="flex-1 min-w-0 text-left"
+                      onClick={() => setSelectedTask(task)}
                     >
-                      <IconChevronRight className="size-3" />
+                      <span className="truncate text-[11px] font-medium text-text-primary block">
+                        {task.title}
+                      </span>
                     </button>
-                  ) : task.isEpic ? (
-                    <IconCrown className="size-3 text-purple-400 shrink-0" />
-                  ) : (
-                    <span className="size-3 shrink-0" />
-                  )}
 
-                  {/* Activity name — clickable */}
-                  <button
-                    type="button"
-                    className="flex-1 min-w-0 text-left"
-                    onClick={() => setSelectedTask(task)}
-                  >
-                    <span className="truncate text-[11px] font-medium text-text-primary block">
-                      {task.title}
+                    {/* Start date */}
+                    <span
+                      style={{ width: `${colWidths.start}px` }}
+                      className="shrink-0 text-center text-[10px] text-text-muted font-mono truncate"
+                    >
+                      {formatShortDate(task.startDate)}
                     </span>
-                  </button>
 
-                  {/* Start date */}
-                  <span className="w-14 shrink-0 text-center text-[10px] text-text-muted font-mono">
-                    {formatShortDate(task.startDate)}
-                  </span>
+                    {/* Due date */}
+                    <span
+                      style={{ width: `${colWidths.due}px` }}
+                      className="shrink-0 text-center text-[10px] text-text-muted font-mono truncate"
+                    >
+                      {formatShortDate(task.dueDate)}
+                    </span>
 
-                  {/* Due date */}
-                  <span className="w-14 shrink-0 text-center text-[10px] text-text-muted font-mono">
-                    {formatShortDate(task.dueDate)}
-                  </span>
+                    {/* Assignee */}
+                    <span
+                      style={{ width: `${colWidths.assignee}px` }}
+                      className="shrink-0 text-center text-[10px] text-text-secondary truncate"
+                    >
+                      {assigneeName}
+                    </span>
 
-                  {/* Assignee */}
-                  <span className="w-16 shrink-0 text-center text-[10px] text-text-secondary truncate">
-                    {assigneeName}
-                  </span>
+                    {/* Predecessor */}
+                    <span
+                      style={{ width: `${colWidths.predecessor}px` }}
+                      className="shrink-0 text-right text-[10px] text-text-muted truncate pr-2"
+                      title={predLabel === "—" ? undefined : predLabel}
+                    >
+                      {predLabel}
+                    </span>
+                  </div>
 
-                  {/* Predecessor */}
-                  <span
-                    className="w-16 shrink-0 text-right text-[10px] text-text-muted truncate pr-1"
-                    title={predLabel === "—" ? undefined : predLabel}
+                  {/* Right timeline cell containing Gantt bar */}
+                  <div
+                    style={{ width: `${timelineWidthPx}px` }}
+                    className="relative shrink-0 flex items-center h-full"
                   >
-                    {predLabel}
-                  </span>
+                    <GanttBar
+                      task={task}
+                      timelineStartIso={timelineStartIso}
+                      columnWidthPx={COLUMN_WIDTH_PX}
+                      dragState={dragState}
+                      onStartDrag={startDrag}
+                      onClick={() => setSelectedTask(task)}
+                    />
+                  </div>
                 </div>
               );
             })}
-          </div>
-
-          {/* Resize handle */}
-          <div
-            onMouseDown={handleResizeMouseDown}
-            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors z-30 group"
-          >
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-border group-hover:bg-primary/60 transition-colors" />
-          </div>
-        </div>
-
-        {/* ── Right scrollable timeline ───────────────────────────────── */}
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-x-auto overflow-y-hidden relative bg-surface/40"
-        >
-          <div style={{ width: `${timelineWidthPx}px` }} className="relative">
-            {/* Timescale header */}
-            <GanttHeader columns={columns} columnWidthPx={COLUMN_WIDTH_PX} />
-
-            {/* Grid rows + bars */}
-            <div className="relative flex flex-col divide-y divide-border/30">
-              {/* Background vertical day grid lines */}
-              <div className="absolute inset-0 flex pointer-events-none">
-                {columns.map((col) => (
-                  <div
-                    key={`grid-${col.dateString}`}
-                    style={{ width: `${COLUMN_WIDTH_PX}px` }}
-                    className={cn(
-                      "border-r border-border/20 h-full shrink-0",
-                      col.isToday
-                        ? "bg-primary/5 ring-1 ring-inset ring-primary/20"
-                        : col.isWeekend
-                        ? "bg-background/20"
-                        : ""
-                    )}
-                  />
-                ))}
-              </div>
-
-              {/* Predecessor arrows SVG overlay */}
-              {predecessorArrows.length > 0 && (
-                <svg
-                  className="absolute inset-0 pointer-events-none z-20"
-                  style={{
-                    width: `${timelineWidthPx}px`,
-                    height: `${visibleTasks.length * ROW_HEIGHT_PX}px`,
-                  }}
-                  overflow="visible"
-                >
-                  <defs>
-                    <marker
-                      id="arrow-head"
-                      markerWidth="6"
-                      markerHeight="6"
-                      refX="5"
-                      refY="3"
-                      orient="auto"
-                    >
-                      <path
-                        d="M0,0 L0,6 L6,3 z"
-                        fill="rgba(148,163,184,0.7)"
-                      />
-                    </marker>
-                  </defs>
-                  {predecessorArrows.map((arrow) => {
-                    const midX = (arrow.fromX + arrow.toX) / 2;
-                    const path =
-                      arrow.fromY === arrow.toY
-                        ? `M${arrow.fromX},${arrow.fromY} L${arrow.toX},${arrow.toY}`
-                        : `M${arrow.fromX},${arrow.fromY} C${midX},${arrow.fromY} ${midX},${arrow.toY} ${arrow.toX},${arrow.toY}`;
-                    return (
-                      <path
-                        key={`${arrow.fromTaskId}-${arrow.toTaskId}`}
-                        d={path}
-                        fill="none"
-                        stroke="rgba(148,163,184,0.55)"
-                        strokeWidth="1.5"
-                        strokeDasharray="4 3"
-                        markerEnd="url(#arrow-head)"
-                      />
-                    );
-                  })}
-                </svg>
-              )}
-
-              {/* Rows */}
-              {visibleTasks.map((task) => (
-                <div
-                  key={`row-${task.id}`}
-                  style={{ height: `${ROW_HEIGHT_PX}px` }}
-                  className="relative w-full hover:bg-surface-elevated/20 transition-colors"
-                >
-                  <GanttBar
-                    task={task}
-                    timelineStartIso={timelineStartIso}
-                    columnWidthPx={COLUMN_WIDTH_PX}
-                    dragState={dragState}
-                    onStartDrag={startDrag}
-                    onClick={() => setSelectedTask(task)}
-                  />
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

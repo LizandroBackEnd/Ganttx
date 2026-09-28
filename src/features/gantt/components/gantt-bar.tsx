@@ -134,7 +134,7 @@ export function GanttBar({
         left: `${leftPx}px`,
         width: `${widthPx}px`,
       }}
-      className={`group absolute top-1.5 h-7 rounded-md border text-xs select-none transition-all cursor-grab active:cursor-grabbing backdrop-blur-xs ${
+      className={`group absolute top-1/2 -translate-y-1/2 h-7 rounded-md border text-xs select-none transition-all cursor-grab active:cursor-grabbing backdrop-blur-xs ${
         isCurrentlyDragging
           ? "border-primary bg-primary/30 shadow-lg ring-2 ring-primary/40 z-30"
           : `${priorityGradient.bg} ${priorityGradient.glow} z-10`
