@@ -675,6 +675,7 @@ export function GanttChart({
                       dragState={dragState}
                       onStartDrag={startDrag}
                       onClick={() => setSelectedTask(task)}
+                      customStatuses={customStatuses}
                     />
                   </div>
                 </div>

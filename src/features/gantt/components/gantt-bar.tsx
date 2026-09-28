@@ -3,7 +3,14 @@
 import { useMemo } from "react";
 import { IconCrown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { getTaskBucketId, getBucketColor, isTaskDone, type TaskDTO } from "@/features/tasks";
+import {
+  getTaskBucketId,
+  getBucketColor,
+  getProjectBuckets,
+  isTaskDone,
+  type TaskDTO,
+  type CustomStatusOption,
+} from "@/features/tasks";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
 export interface GanttBarProps {
@@ -19,12 +26,96 @@ export interface GanttBarProps {
     due: string
   ) => void;
   readonly onClick?: () => void;
+  readonly customStatuses?: readonly CustomStatusOption[] | null;
 }
 
 function getDayDiff(startDateIso: string, targetDateIso: string): number {
   const d1 = new Date(`${startDateIso}T00:00:00.000Z`).getTime();
   const d2 = new Date(`${targetDateIso}T00:00:00.000Z`).getTime();
   return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+}
+
+interface BarPalette {
+  bg: string;
+  fill: string;
+  glow: string;
+  handle: string;
+}
+
+const EPIC_PALETTE: BarPalette = {
+  bg: "bg-gradient-to-r from-purple-500/25 via-indigo-500/30 to-purple-500/35 border-purple-500/60 hover:border-purple-400 ring-1 ring-purple-500/30",
+  fill: "bg-gradient-to-r from-purple-500/50 to-indigo-400/60",
+  glow: "hover:shadow-[0_0_18px_rgba(168,85,247,0.35)]",
+  handle: "bg-purple-400",
+};
+
+const RANDOM_PALETTES: readonly BarPalette[] = [
+  // 1. Emerald / Teal
+  {
+    bg: "bg-gradient-to-r from-emerald-500/20 via-teal-500/25 to-emerald-500/30 border-emerald-500/50 hover:border-emerald-400",
+    fill: "bg-gradient-to-r from-emerald-500/40 to-teal-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(16,185,129,0.25)]",
+    handle: "bg-emerald-400",
+  },
+  // 2. Sky / Blue
+  {
+    bg: "bg-gradient-to-r from-sky-500/20 via-blue-500/25 to-sky-500/30 border-sky-500/50 hover:border-sky-400",
+    fill: "bg-gradient-to-r from-sky-500/40 to-blue-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(14,165,233,0.25)]",
+    handle: "bg-sky-400",
+  },
+  // 3. Amber / Orange
+  {
+    bg: "bg-gradient-to-r from-amber-500/20 via-orange-500/25 to-amber-500/30 border-amber-500/50 hover:border-amber-400",
+    fill: "bg-gradient-to-r from-amber-500/40 to-orange-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(245,158,11,0.25)]",
+    handle: "bg-amber-400",
+  },
+  // 4. Rose / Red
+  {
+    bg: "bg-gradient-to-r from-rose-500/20 via-red-500/25 to-rose-500/30 border-rose-500/50 hover:border-rose-400",
+    fill: "bg-gradient-to-r from-rose-500/40 to-red-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(244,63,94,0.3)]",
+    handle: "bg-rose-400",
+  },
+  // 5. Indigo / Violet
+  {
+    bg: "bg-gradient-to-r from-indigo-500/20 via-violet-500/25 to-indigo-500/30 border-indigo-500/50 hover:border-indigo-400",
+    fill: "bg-gradient-to-r from-indigo-500/40 to-violet-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(99,102,241,0.25)]",
+    handle: "bg-indigo-400",
+  },
+  // 6. Fuchsia / Pink
+  {
+    bg: "bg-gradient-to-r from-fuchsia-500/20 via-pink-500/25 to-fuchsia-500/30 border-fuchsia-500/50 hover:border-fuchsia-400",
+    fill: "bg-gradient-to-r from-fuchsia-500/40 to-pink-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(217,70,239,0.25)]",
+    handle: "bg-fuchsia-400",
+  },
+  // 7. Lime / Green
+  {
+    bg: "bg-gradient-to-r from-lime-500/20 via-emerald-500/25 to-lime-500/30 border-lime-500/50 hover:border-lime-400",
+    fill: "bg-gradient-to-r from-lime-500/40 to-emerald-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(132,204,22,0.25)]",
+    handle: "bg-lime-400",
+  },
+  // 8. Cyan / Blue
+  {
+    bg: "bg-gradient-to-r from-cyan-500/20 via-blue-500/25 to-cyan-500/30 border-cyan-500/50 hover:border-cyan-400",
+    fill: "bg-gradient-to-r from-cyan-500/40 to-blue-400/50",
+    glow: "hover:shadow-[0_0_15px_rgba(6,182,212,0.25)]",
+    handle: "bg-cyan-400",
+  },
+];
+
+function getTaskPalette(taskId: string): BarPalette {
+  let hash = 0;
+  for (let i = 0; i < taskId.length; i++) {
+    hash = (hash << 5) - hash + taskId.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % RANDOM_PALETTES.length;
+  return RANDOM_PALETTES[idx] ?? RANDOM_PALETTES[0];
 }
 
 export function GanttBar({
@@ -34,6 +125,7 @@ export function GanttBar({
   dragState,
   onStartDrag,
   onClick,
+  customStatuses,
 }: GanttBarProps): React.JSX.Element {
   const isCurrentlyDragging = dragState?.taskId === task.id;
 
@@ -85,48 +177,19 @@ export function GanttBar({
 
   const priorityGradient = useMemo(() => {
     if (task.isEpic) {
-      return {
-        bg: "bg-gradient-to-r from-purple-500/25 via-indigo-500/30 to-purple-500/35 border-purple-500/60 hover:border-purple-400 ring-1 ring-purple-500/30",
-        fill: "bg-gradient-to-r from-purple-500/50 to-indigo-400/60",
-        glow: "hover:shadow-[0_0_18px_rgba(168,85,247,0.35)]",
-        handle: "bg-purple-400",
-      };
+      return EPIC_PALETTE;
     }
+    return getTaskPalette(task.id);
+  }, [task.isEpic, task.id]);
 
-    const primaryLabel = task.label.split(",")[0]?.trim() ?? task.label;
+  const bucketId = getTaskBucketId(task.bucket);
+  const buckets = useMemo(() => getProjectBuckets(customStatuses), [customStatuses]);
+  const bucketOption = useMemo(() => {
+    return buckets.find((b) => b.id.toUpperCase() === bucketId.toUpperCase());
+  }, [buckets, bucketId]);
 
-    switch (primaryLabel) {
-      case "LOW":
-        return {
-          bg: "bg-gradient-to-r from-emerald-500/15 via-teal-500/20 to-emerald-500/25 border-emerald-500/40 hover:border-emerald-400",
-          fill: "bg-gradient-to-r from-emerald-500/40 to-teal-400/50",
-          glow: "hover:shadow-[0_0_15px_rgba(0,242,142,0.25)]",
-          handle: "bg-emerald-400",
-        };
-      case "MEDIUM":
-        return {
-          bg: "bg-gradient-to-r from-sky-500/15 via-blue-500/20 to-sky-500/25 border-sky-500/40 hover:border-sky-400",
-          fill: "bg-gradient-to-r from-sky-500/40 to-blue-400/50",
-          glow: "hover:shadow-[0_0_15px_rgba(14,165,233,0.25)]",
-          handle: "bg-sky-400",
-        };
-      case "HIGH":
-        return {
-          bg: "bg-gradient-to-r from-amber-500/15 via-orange-500/20 to-amber-500/25 border-amber-500/40 hover:border-amber-400",
-          fill: "bg-gradient-to-r from-amber-500/40 to-orange-400/50",
-          glow: "hover:shadow-[0_0_15px_rgba(245,158,11,0.25)]",
-          handle: "bg-amber-400",
-        };
-      case "URGENT":
-      default:
-        return {
-          bg: "bg-gradient-to-r from-rose-500/20 via-red-500/25 to-rose-500/30 border-rose-500/50 hover:border-rose-400",
-          fill: "bg-gradient-to-r from-rose-500/50 to-red-400/60",
-          glow: "hover:shadow-[0_0_15px_rgba(244,63,94,0.3)]",
-          handle: "bg-rose-400",
-        };
-    }
-  }, [task.isEpic, task.label]);
+  const bucketLabel = bucketOption?.label ?? bucketId;
+  const bucketColor = bucketOption?.color ?? getBucketColor(bucketId);
 
   return (
     <div
@@ -178,12 +241,12 @@ export function GanttBar({
             {task.label.split(",")[0]?.trim()}
           </span>
           {/* Bucket / status */}
-          <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[9px] font-semibold bg-black/20 text-text-primary/80 leading-4">
+          <span className="inline-flex items-center gap-1 rounded px-1.5 py-0 text-[9px] font-semibold bg-black/30 text-text-primary/90 leading-4">
             <span
               className="inline-block size-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: getBucketColor(getTaskBucketId(task.bucket)) }}
+              style={{ backgroundColor: bucketColor }}
             />
-            {getTaskBucketId(task.bucket)}
+            {bucketLabel}
           </span>
         </div>
       </div>
