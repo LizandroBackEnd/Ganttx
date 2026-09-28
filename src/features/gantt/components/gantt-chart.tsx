@@ -114,6 +114,39 @@ interface PredecessorArrow {
   toY: number;   // center Y of successor row
 }
 
+/**
+ * Generates an orthogonal (rectilinear 90° Manhattan) SVG path between predecessor
+ * and successor task bars. Avoids overlapping bars by using inter-row corridor routing.
+ */
+function getOrthogonalPath(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  rowHeight: number = ROW_HEIGHT_PX
+): string {
+  // If tasks are on the exact same row (rare horizontal sequence)
+  if (fromY === toY) {
+    return `M ${fromX} ${fromY} L ${toX} ${toY}`;
+  }
+
+  const offset = 14;
+
+  // Case 1: Standard forward sequence with space for step-down/up
+  if (toX >= fromX + offset + 6) {
+    return `M ${fromX} ${fromY} L ${fromX + offset} ${fromY} L ${fromX + offset} ${toY} L ${toX} ${toY}`;
+  }
+
+  // Case 2: Overlapping dates or backward dependency
+  // Route around tasks via the inter-row corridor so we don't cut across task bars
+  const exitX = fromX + offset;
+  const isGoingDown = toY > fromY;
+  const corridorY = fromY + (isGoingDown ? 1 : -1) * (rowHeight / 2);
+  const entryX = toX - offset;
+
+  return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${corridorY} L ${entryX} ${corridorY} L ${entryX} ${toY} L ${toX} ${toY}`;
+}
+
 export function GanttChart({
   projectId,
   tasks,
@@ -520,34 +553,42 @@ export function GanttChart({
               >
                 <defs>
                   <marker
-                    id="arrow-head"
-                    markerWidth="6"
-                    markerHeight="6"
-                    refX="5"
-                    refY="3"
+                    id="arrow-head-red"
+                    markerWidth="8"
+                    markerHeight="8"
+                    refX="6"
+                    refY="4"
                     orient="auto"
                   >
                     <path
-                      d="M0,0 L0,6 L6,3 z"
-                      fill="rgba(148,163,184,0.7)"
+                      d="M 1 1.5 L 7 4 L 1 6.5 Z"
+                      fill="#ef4444"
                     />
                   </marker>
                 </defs>
                 {predecessorArrows.map((arrow) => {
-                  const midX = (arrow.fromX + arrow.toX) / 2;
-                  const path =
-                    arrow.fromY === arrow.toY
-                      ? `M${arrow.fromX},${arrow.fromY} L${arrow.toX},${arrow.toY}`
-                      : `M${arrow.fromX},${arrow.fromY} C${midX},${arrow.fromY} ${midX},${arrow.toY} ${arrow.toX},${arrow.toY}`;
+                  const isHighlighted =
+                    hoveredTaskId === arrow.fromTaskId ||
+                    hoveredTaskId === arrow.toTaskId;
+                  const path = getOrthogonalPath(
+                    arrow.fromX,
+                    arrow.fromY,
+                    arrow.toX,
+                    arrow.toY
+                  );
+
                   return (
                     <path
                       key={`${arrow.fromTaskId}-${arrow.toTaskId}`}
                       d={path}
                       fill="none"
-                      stroke="rgba(148,163,184,0.55)"
-                      strokeWidth="1.5"
-                      strokeDasharray="4 3"
-                      markerEnd="url(#arrow-head)"
+                      stroke="#ef4444"
+                      strokeWidth={isHighlighted ? 2.5 : 2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}
+                      opacity={hoveredTaskId ? (isHighlighted ? 1 : 0.35) : 0.95}
+                      markerEnd="url(#arrow-head-red)"
                     />
                   );
                 })}
