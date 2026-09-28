@@ -88,7 +88,7 @@ export function TaskMarkdownEditor({
     content: value,
     editable: !disabled,
     onUpdate: ({ editor }) => {
-      const markdownStorage = editor.storage.markdown as { getMarkdown: () => string };
+      const markdownStorage = (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown;
       onChange(markdownStorage.getMarkdown());
     },
     onBlur: () => {
@@ -135,7 +135,7 @@ export function TaskMarkdownEditor({
   // Update content if value changes externally
   useEffect(() => {
     if (editor) {
-      const markdownStorage = editor.storage.markdown as { getMarkdown: () => string };
+      const markdownStorage = (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown;
       if (value !== markdownStorage.getMarkdown()) {
         // Only update if the editor is not focused to avoid cursor jumping
         if (!editor.isFocused) {

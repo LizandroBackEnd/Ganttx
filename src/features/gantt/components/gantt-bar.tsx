@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { IconCrown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { getTaskBucketId, isTaskDone, type TaskDTO } from "@/features/tasks";
+import { getTaskBucketId, getBucketColor, isTaskDone, type TaskDTO } from "@/features/tasks";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
 export interface GanttBarProps {
@@ -171,9 +171,21 @@ export function GanttBar({
             {task.title}
           </span>
         </div>
-        <span className="font-mono text-[10px] text-text-muted ml-1 shrink-0">
-          {getTaskBucketId(task.bucket)}
-        </span>
+        {/* Label (priority) badge + bucket (status) badge */}
+        <div className="flex items-center gap-1 ml-1.5 shrink-0">
+          {/* Priority label */}
+          <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-semibold bg-white/10 text-text-primary/80 leading-4">
+            {task.label.split(",")[0]?.trim()}
+          </span>
+          {/* Bucket / status */}
+          <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 text-[9px] font-semibold bg-black/20 text-text-primary/80 leading-4">
+            <span
+              className="inline-block size-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: getBucketColor(getTaskBucketId(task.bucket)) }}
+            />
+            {getTaskBucketId(task.bucket)}
+          </span>
+        </div>
       </div>
 
       {/* Resize Right Handle */}

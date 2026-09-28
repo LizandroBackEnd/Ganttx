@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCalendar, ViewSwitcher, DateNavigator, CalendarGrid } from "@/features/calendar";
 import { TaskBoard, TaskFormDialog, type ProjectMemberOption } from "@/features/tasks";
@@ -13,6 +13,7 @@ import {
 } from "./project-sidebar";
 import { Button } from "@/shared/components/ui/button";
 import { IconPlus } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
 import type { TaskDTO } from "@/features/tasks";
 import type { ProjectDetailDTO } from "../types/project.types";
 
@@ -30,6 +31,7 @@ export function ProjectWorkspace({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const [isGanttFullscreen, setIsGanttFullscreen] = useState(false);
 
   const viewParam = searchParams.get("view");
   const primaryView: WorkspacePrimaryView =
@@ -158,7 +160,13 @@ export function ProjectWorkspace({
               canEdit={true}
             />
           ) : primaryView === "gantt" ? (
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div
+              className={cn(
+                isGanttFullscreen
+                  ? "fixed inset-0 z-50 bg-surface p-4 flex flex-col"
+                  : "flex-1 min-h-0 overflow-auto flex flex-col"
+              )}
+            >
               <GanttChart
                 projectId={project.id}
                 tasks={tasks}
@@ -166,6 +174,8 @@ export function ProjectWorkspace({
                 availableEpics={availableEpics}
                 customStatuses={project.customStatuses}
                 customPriorities={project.customPriorities}
+                isFullscreen={isGanttFullscreen}
+                onToggleFullscreen={() => setIsGanttFullscreen((v) => !v)}
               />
             </div>
           ) : (
