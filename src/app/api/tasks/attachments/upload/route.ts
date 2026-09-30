@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { uploadBufferToBlob } from "@/lib/azure-blob";
+import { uploadBufferToStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const result = await uploadBufferToBlob(
+    const result = await uploadBufferToStorage(
       buffer,
       file.name,
       file.type,

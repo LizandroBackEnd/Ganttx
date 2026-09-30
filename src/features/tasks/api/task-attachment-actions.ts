@@ -1,12 +1,12 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { uploadBufferToBlob, type UploadedBlobResult } from "@/lib/azure-blob";
+import { uploadBufferToStorage, type UploadedFileResult } from "@/lib/storage";
 
 export interface UploadActionResult {
   readonly success: boolean;
   readonly error?: string;
-  readonly data?: UploadedBlobResult;
+  readonly data?: UploadedFileResult;
 }
 
 export async function uploadTaskAttachmentAction(
@@ -31,7 +31,7 @@ export async function uploadTaskAttachmentAction(
   try {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const result = await uploadBufferToBlob(
+    const result = await uploadBufferToStorage(
       buffer,
       file.name,
       file.type,

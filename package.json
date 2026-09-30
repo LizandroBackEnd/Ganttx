@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
-    "@azure/storage-blob": "^12.34.0",
+    "@aws-sdk/client-s3": "^3.1143.0",
+    "@aws-sdk/s3-request-presigner": "^3.1143.0",
     "@neon/config": "^1.8.3",
     "@neon/env": "^1.4.8",
     "@prisma/adapter-pg": "^7.10.0",
