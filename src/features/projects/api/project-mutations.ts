@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { projectEvents } from "@/lib/events";
+import { sendProjectInvitationEmail } from "../lib/send-project-invitation";
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -160,7 +161,7 @@ export async function deleteProject(
 
 export async function inviteMember(
   input: InviteMemberInput
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<{ emailSent: boolean }>> {
   const parsed = inviteMemberSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -177,6 +178,7 @@ export async function inviteMember(
 
   const callerId = session.user.id;
   const { projectId, email, role } = parsed.data;
+  const normalizedEmail = email.trim().toLowerCase();
 
   // Caller must be OWNER or ADMIN
   const callerMembership = await prisma.projectMember.findUnique({
@@ -190,17 +192,29 @@ export async function inviteMember(
     return { success: false, error: "Permiso denegado: se requiere rol de administrador para invitar miembros" };
   }
 
-  // Find target user by email
-  const targetUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
+  // Fetch project details for the invitation email
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { name: true },
+  });
+
+  if (!project) {
+    return { success: false, error: "Proyecto no encontrado" };
+  }
+
+  // Find or create target user by email so they can be invited before first login
+  let targetUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true, email: true },
   });
 
   if (!targetUser) {
-    return {
-      success: false,
-      error: "No se encontró ningún usuario registrado con ese correo electrónico",
-    };
+    targetUser = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+      },
+      select: { id: true, email: true },
+    });
   }
 
   // Check if target user is already a member
@@ -224,10 +238,29 @@ export async function inviteMember(
       },
     });
 
+    // Send branded invitation email via Gmail REST API
+    const inviterName = session.user.name || session.user.email || "Un miembro del equipo";
+    const emailResult = await sendProjectInvitationEmail({
+      toEmail: normalizedEmail,
+      projectName: project.name,
+      projectId,
+      inviterName,
+      role,
+    });
+
+    if (!emailResult.success) {
+      console.warn("[inviteMember] Email dispatch warning:", emailResult.error);
+    }
+
     projectEvents.emit(projectId, "member:joined", { userId: targetUser.id, role }, callerId);
     revalidatePath(`/projects/${projectId}/settings`);
-    return { success: true, data: undefined };
-  } catch {
+
+    return {
+      success: true,
+      data: { emailSent: emailResult.success },
+    };
+  } catch (err) {
+    console.error("[inviteMember] Failed to add project member:", err);
     return { success: false, error: "Error al invitar al miembro" };
   }
 }

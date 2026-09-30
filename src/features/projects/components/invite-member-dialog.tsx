@@ -60,12 +60,15 @@ export function InviteMemberDialog({
       }
 
       const invitedEmail = email.trim();
+      const emailSent = result.data.emailSent;
       setIsOpen(false);
       setEmail("");
       setRole("MEMBER");
       sileo.success({
         title: "Invitación enviada",
-        description: `Se envió una invitación a "${invitedEmail}".`,
+        description: emailSent
+          ? `Se envió un correo de invitación a "${invitedEmail}" y se agregó al proyecto.`
+          : `Se agregó a "${invitedEmail}" al proyecto.`,
       });
       router.refresh();
     } catch {
@@ -97,7 +100,7 @@ export function InviteMemberDialog({
               Invitar Miembro del Equipo
             </DialogTitle>
             <DialogDescription className="text-sm text-text-secondary">
-              Invita a un usuario registrado mediante su correo electrónico para colaborar en este proyecto.
+              Invita a un colaborador mediante su correo electrónico de Google para trabajar en este proyecto.
             </DialogDescription>
           </DialogHeader>
 
