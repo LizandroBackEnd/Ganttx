@@ -20,6 +20,15 @@ export const metadata: Metadata = {
   title: "Ganttx — Gestión de Proyectos Colaborativa",
   description:
     "Gestión de proyectos en tiempo real con cronogramas Gantt interactivos y vistas de calendario.",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    apple: [
+      { url: "/apple-icon.png" },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -35,6 +44,8 @@ export default function RootLayout({
     >
       <head>
         <ThemeScript />
+        <link rel="icon" href="/icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

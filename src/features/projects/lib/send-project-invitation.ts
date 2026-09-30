@@ -1,7 +1,30 @@
 import "server-only";
 
-import { sendEmail, type SendEmailResult } from "@/lib/email";
+import fs from "node:fs";
+import path from "node:path";
+import { sendEmail, type SendEmailResult, type EmailInlineAttachment } from "@/lib/email";
 import type { ProjectRole } from "@prisma/client";
+
+let cachedIconBase64: string | null = null;
+
+function getIconBase64(): string | null {
+  if (cachedIconBase64) return cachedIconBase64;
+  try {
+    const iconPath = path.join(process.cwd(), "public", "ganttx-icon.png");
+    if (fs.existsSync(iconPath)) {
+      cachedIconBase64 = fs.readFileSync(iconPath).toString("base64");
+      return cachedIconBase64;
+    }
+    const fullPath = path.join(process.cwd(), "public", "ganttx.png");
+    if (fs.existsSync(fullPath)) {
+      cachedIconBase64 = fs.readFileSync(fullPath).toString("base64");
+      return cachedIconBase64;
+    }
+  } catch (err) {
+    console.warn("[sendProjectInvitationEmail] Could not load logo file:", err);
+  }
+  return null;
+}
 
 export interface SendProjectInvitationParams {
   readonly toEmail: string;
@@ -28,6 +51,16 @@ export async function sendProjectInvitationEmail({
       : "Tienes permisos para ver y editar tareas, colaborar en el tablero y cronograma Gantt.";
 
   const subject = `Te invitaron a colaborar en el proyecto "${projectName}" en Ganttx`;
+  const logoBase64 = getIconBase64();
+  const inlineAttachments: EmailInlineAttachment[] = [];
+  if (logoBase64) {
+    inlineAttachments.push({
+      filename: "ganttx-logo.png",
+      contentType: "image/png",
+      contentId: "ganttx-logo",
+      contentBase64: logoBase64,
+    });
+  }
 
   const html = `
 <!DOCTYPE html>
@@ -45,13 +78,23 @@ export async function sendProjectInvitationEmail({
           <!-- Header -->
           <tr>
             <td style="padding: 32px 36px; background: linear-gradient(135deg, rgba(0, 242, 142, 0.08) 0%, rgba(18, 24, 39, 0) 100%); border-bottom: 1px solid #1f293d;">
-              <table role="presentation" width="100%">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td>
-                    <div style="display: inline-flex; align-items: center; gap: 8px;">
-                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background-color: #00f28e; box-shadow: 0 0 10px #00f28e;"></span>
-                      <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">Ganttx</span>
-                    </div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          ${
+                            logoBase64
+                              ? `<img src="cid:ganttx-logo" alt="Ganttx" width="34" height="34" style="display: block; border-radius: 8px; width: 34px; height: 34px;" />`
+                              : `<span style="display: inline-block; width: 14px; height: 14px; border-radius: 4px; background-color: #00f28e; box-shadow: 0 0 10px #00f28e;"></span>`
+                          }
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 10px;">
+                          <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; line-height: 1;">Ganttx</span>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
@@ -119,9 +162,23 @@ export async function sendProjectInvitationEmail({
 </html>
   `.trim();
 
+  const text = `
+¡Hola! Has sido invitado a colaborar en Ganttx.
+
+${inviterName} te ha invitado a unirte al proyecto "${projectName}" con el rol de ${roleLabel}.
+${roleDescription}
+
+Para abrir el proyecto, ingresa en el siguiente enlace:
+${projectUrl}
+
+Si aún no has iniciado sesión en Ganttx, simplemente abre el enlace e inicia sesión con tu cuenta de Google (${toEmail}).
+  `.trim();
+
   return sendEmail({
     to: toEmail,
     subject,
     html,
+    text,
+    inlineAttachments,
   });
 }

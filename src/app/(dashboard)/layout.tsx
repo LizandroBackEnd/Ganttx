@@ -1,9 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { UserMenu } from "@/features/auth";
 import { ThemeToggle } from "@/shared/components";
-import { IconTimeline } from "@tabler/icons-react";
 
 export default async function DashboardLayout({
   children,
@@ -21,10 +21,15 @@ export default async function DashboardLayout({
       {/* Top Navigation Bar */}
       <header className="shrink-0 flex h-14 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-md z-40">
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary group-hover:bg-primary/20 transition-colors">
-              <IconTimeline className="size-4" />
-            </div>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Image
+              src="/ganttx.png"
+              alt="Ganttx"
+              width={32}
+              height={32}
+              className="size-7.5 rounded-lg object-contain transition-transform group-hover:scale-105"
+              priority
+            />
             <span className="font-bold tracking-tight text-text-primary text-base">
               Ganttx
             </span>

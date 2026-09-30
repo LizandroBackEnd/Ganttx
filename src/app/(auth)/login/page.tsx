@@ -1,4 +1,4 @@
-import { IconTimeline } from "@tabler/icons-react";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { GoogleSignInButton } from "@/features/auth";
@@ -27,12 +27,19 @@ export default async function LoginPage({
 
       <div className="relative rounded-2xl border border-border/80 bg-surface/90 p-8 shadow-2xl backdrop-blur-md overflow-hidden">
         {/* Top subtle accent gradient */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-emerald-400 via-teal-400 to-cyan-400" />
 
         {/* Brand Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(0,242,142,0.2)]">
-            <IconTimeline className="size-7" />
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-surface-elevated/60 border border-border/80 shadow-[0_0_25px_rgba(0,242,142,0.18)] p-1">
+            <Image
+              src="/ganttx.png"
+              alt="Ganttx"
+              width={56}
+              height={56}
+              className="size-14 rounded-xl object-contain"
+              priority
+            />
           </div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 mb-1 inline-block">
             Plataforma Colaborativa

@@ -1,10 +1,18 @@
 import "server-only";
 
+export interface EmailInlineAttachment {
+  readonly filename: string;
+  readonly contentType: string;
+  readonly contentId: string;
+  readonly contentBase64: string;
+}
+
 export interface SendEmailOptions {
   readonly to: string;
   readonly subject: string;
   readonly html: string;
   readonly text?: string;
+  readonly inlineAttachments?: readonly EmailInlineAttachment[];
 }
 
 export interface SendEmailResult {
@@ -63,19 +71,87 @@ async function getGmailAccessToken(): Promise<string | null> {
   }
 }
 
-function encodeRfc2822Base64Url(from: string, to: string, subject: string, html: string): string {
+function encodeRfc2822Base64Url(
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+  text?: string,
+  inlineAttachments?: readonly EmailInlineAttachment[]
+): string {
   const base64Subject = Buffer.from(subject, "utf-8").toString("base64");
   const utf8Subject = `=?utf-8?B?${base64Subject}?=`;
+  const plainText = text || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-  const emailLines = [
+  const hasAttachments = inlineAttachments && inlineAttachments.length > 0;
+  const altBoundary = `==_alt_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}_==`;
+  const relatedBoundary = `==_rel_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}_==`;
+
+  const emailLines: string[] = [
     `From: Ganttx <${from}>`,
     `To: ${to}`,
     `Subject: ${utf8Subject}`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${Date.now()}.${Math.random().toString(36).substring(2)}@gmail.com>`,
+    `Reply-To: ${from}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/html; charset=utf-8",
-    "",
-    html,
   ];
+
+  if (hasAttachments) {
+    emailLines.push(
+      `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+      "",
+      `--${relatedBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      "",
+      `--${altBoundary}`,
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      plainText,
+      "",
+      `--${altBoundary}`,
+      "Content-Type: text/html; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      html,
+      "",
+      `--${altBoundary}--`
+    );
+
+    for (const att of inlineAttachments) {
+      emailLines.push(
+        "",
+        `--${relatedBoundary}`,
+        `Content-Type: ${att.contentType}; name="${att.filename}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-ID: <${att.contentId}>`,
+        `Content-Disposition: inline; filename="${att.filename}"`,
+        "",
+        att.contentBase64
+      );
+    }
+
+    emailLines.push("", `--${relatedBoundary}--`);
+  } else {
+    emailLines.push(
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      "",
+      `--${altBoundary}`,
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      plainText,
+      "",
+      `--${altBoundary}`,
+      "Content-Type: text/html; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      html,
+      "",
+      `--${altBoundary}--`
+    );
+  }
 
   const rawMessage = emailLines.join("\r\n");
   return Buffer.from(rawMessage, "utf-8")
@@ -89,6 +165,8 @@ export async function sendEmail({
   to,
   subject,
   html,
+  text,
+  inlineAttachments,
 }: SendEmailOptions): Promise<SendEmailResult> {
   const senderEmail = process.env.EMAIL_USER;
   if (!senderEmail) {
@@ -107,7 +185,7 @@ export async function sendEmail({
   }
 
   try {
-    const rawEncoded = encodeRfc2822Base64Url(senderEmail, to, subject, html);
+    const rawEncoded = encodeRfc2822Base64Url(senderEmail, to, subject, html, text, inlineAttachments);
 
     const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
