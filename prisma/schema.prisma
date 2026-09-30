@@ -143,8 +143,8 @@ model Task {
   description        String?   @db.Text
   label              String    @default("MEDIUM") @db.VarChar(50)
   bucket             String    @db.VarChar(50)
-  startDate          DateTime  @map("start_date") @db.Date
-  dueDate            DateTime  @map("due_date") @db.Date
+  startDate          DateTime? @map("start_date") @db.Date
+  dueDate            DateTime? @map("due_date") @db.Date
   predecessors       String?   @map("predecessors") @db.Text
   isEpic             Boolean   @default(false) @map("is_epic")
   showSubtasksOnCard Boolean   @default(false) @map("show_subtasks_on_card")

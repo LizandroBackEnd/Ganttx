@@ -86,7 +86,7 @@ export function CalendarGrid({
       const date = new Date(year, month - 1, dayNum);
       const dateString = formatLocalDateToIsoString(date);
       const dayTasks = tasks.filter(
-        (t) => t.startDate <= dateString && t.dueDate >= dateString
+        (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dateString && t.dueDate >= dateString)
       );
       cells.push({
         date,
@@ -103,7 +103,7 @@ export function CalendarGrid({
       const date = new Date(year, month, day);
       const dateString = formatLocalDateToIsoString(date);
       const dayTasks = tasks.filter(
-        (t) => t.startDate <= dateString && t.dueDate >= dateString
+        (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dateString && t.dueDate >= dateString)
       );
       cells.push({
         date,
@@ -121,7 +121,7 @@ export function CalendarGrid({
       const date = new Date(year, month + 1, i);
       const dateString = formatLocalDateToIsoString(date);
       const dayTasks = tasks.filter(
-        (t) => t.startDate <= dateString && t.dueDate >= dateString
+        (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dateString && t.dueDate >= dateString)
       );
       cells.push({
         date,
@@ -150,7 +150,7 @@ export function CalendarGrid({
       date.setDate(start.getDate() + i);
       const dateString = formatLocalDateToIsoString(date);
       const dayTasks = tasks.filter(
-        (t) => t.startDate <= dateString && t.dueDate >= dateString
+        (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dateString && t.dueDate >= dateString)
       );
       days.push({
         date,
@@ -169,7 +169,7 @@ export function CalendarGrid({
   const dayDateStr = formatLocalDateToIsoString(currentDate);
   const dayTasks = useMemo(() => {
     return tasks.filter(
-      (t) => t.startDate <= dayDateStr && t.dueDate >= dayDateStr
+      (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dayDateStr && t.dueDate >= dayDateStr)
     );
   }, [tasks, dayDateStr]);
 
@@ -365,6 +365,7 @@ export function CalendarGrid({
           const daysInMonth = new Date(year, m + 1, 0).getDate();
 
           const monthTasks = tasks.filter((t) => {
+            if (!t.startDate) return false;
             const startMonth = new Date(t.startDate).getMonth();
             const startYear = new Date(t.startDate).getFullYear();
             return startMonth === m && startYear === year;
@@ -387,7 +388,7 @@ export function CalendarGrid({
                   const isToday = year === currentYear && m === currentMonth && d === currentDay;
                   const dStr = `${year}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                   const hasTasks = tasks.some(
-                    (t) => t.startDate <= dStr && t.dueDate >= dStr
+                    (t) => Boolean(t.startDate && t.dueDate && t.startDate <= dStr && t.dueDate >= dStr)
                   );
                   return (
                     <div

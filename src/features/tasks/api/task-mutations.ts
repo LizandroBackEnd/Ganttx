@@ -30,7 +30,8 @@ function parseDateStringToUtcDate(dateString: string): Date {
   return new Date(`${dateString}T00:00:00.000Z`);
 }
 
-function formatLocalDateToIso(d: Date): string {
+function formatLocalDateToIso(d: Date | null | undefined): string | null {
+  if (!d) return null;
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -91,13 +92,13 @@ export async function createTask(
     if (parent) {
       const parentStartIso = formatLocalDateToIso(parent.startDate);
       const parentDueIso = formatLocalDateToIso(parent.dueDate);
-      if (startDate < parentStartIso) {
+      if (startDate && parentStartIso && startDate < parentStartIso) {
         return {
           success: false,
           error: `La fecha de inicio de la subtarea (${startDate}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
         };
       }
-      if (dueDate > parentDueIso) {
+      if (dueDate && parentDueIso && dueDate > parentDueIso) {
         return {
           success: false,
           error: `La fecha de fin de la subtarea (${dueDate}) no puede ser posterior a la de la tarea principal (${parentDueIso})`,
@@ -113,8 +114,8 @@ export async function createTask(
         description: description ?? null,
         label,
         bucket,
-        startDate: parseDateStringToUtcDate(startDate),
-        dueDate: parseDateStringToUtcDate(dueDate),
+        startDate: startDate ? parseDateStringToUtcDate(startDate) : null,
+        dueDate: dueDate ? parseDateStringToUtcDate(dueDate) : null,
         predecessors: predecessors ?? null,
         isEpic: Boolean(isEpic),
         showSubtasksOnCard: Boolean(showSubtasksOnCard),
@@ -253,16 +254,18 @@ export async function updateTask(
     if (parent) {
       const parentStartIso = formatLocalDateToIso(parent.startDate);
       const parentDueIso = formatLocalDateToIso(parent.dueDate);
-      const candidateStart = fields.startDate ?? formatLocalDateToIso(task.startDate);
-      const candidateDue = fields.dueDate ?? formatLocalDateToIso(task.dueDate);
+      const candidateStart =
+        fields.startDate !== undefined ? fields.startDate : formatLocalDateToIso(task.startDate);
+      const candidateDue =
+        fields.dueDate !== undefined ? fields.dueDate : formatLocalDateToIso(task.dueDate);
 
-      if (candidateStart < parentStartIso) {
+      if (candidateStart && parentStartIso && candidateStart < parentStartIso) {
         return {
           success: false,
           error: `La fecha de inicio de la subtarea (${candidateStart}) no puede ser anterior a la de la tarea principal (${parentStartIso})`,
         };
       }
-      if (candidateDue > parentDueIso) {
+      if (candidateDue && parentDueIso && candidateDue > parentDueIso) {
         return {
           success: false,
           error: `La fecha de fin de la subtarea (${candidateDue}) no puede ser posterior a la de la tarea principal (${parentDueIso})`,
@@ -280,10 +283,10 @@ export async function updateTask(
         ...(fields.label !== undefined ? { label: fields.label } : {}),
         ...(fields.bucket !== undefined ? { bucket: fields.bucket } : {}),
         ...(fields.startDate !== undefined
-          ? { startDate: parseDateStringToUtcDate(fields.startDate) }
+          ? { startDate: fields.startDate ? parseDateStringToUtcDate(fields.startDate) : null }
           : {}),
         ...(fields.dueDate !== undefined
-          ? { dueDate: parseDateStringToUtcDate(fields.dueDate) }
+          ? { dueDate: fields.dueDate ? parseDateStringToUtcDate(fields.dueDate) : null }
           : {}),
         ...(fields.predecessors !== undefined ? { predecessors: fields.predecessors } : {}),
         ...(fields.isEpic !== undefined ? { isEpic: fields.isEpic } : {}),
@@ -350,13 +353,13 @@ export async function updateTaskDates(
   if (task.parentId && task.parent?.startDate && task.parent?.dueDate) {
     const parentStartIso = formatLocalDateToIso(task.parent.startDate);
     const parentDueIso = formatLocalDateToIso(task.parent.dueDate);
-    if (startDate < parentStartIso) {
+    if (startDate && parentStartIso && startDate < parentStartIso) {
       return {
         success: false,
         error: `La fecha de inicio de la subtarea no puede ser anterior a la de la tarea principal (${parentStartIso})`,
       };
     }
-    if (dueDate > parentDueIso) {
+    if (dueDate && parentDueIso && dueDate > parentDueIso) {
       return {
         success: false,
         error: `La fecha de fin de la subtarea no puede ser posterior a la de la tarea principal (${parentDueIso})`,
@@ -368,8 +371,8 @@ export async function updateTaskDates(
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        startDate: parseDateStringToUtcDate(startDate),
-        dueDate: parseDateStringToUtcDate(dueDate),
+        startDate: startDate ? parseDateStringToUtcDate(startDate) : null,
+        dueDate: dueDate ? parseDateStringToUtcDate(dueDate) : null,
       },
     });
 
@@ -564,6 +567,8 @@ export async function getSubtasks(
         label: true,
         showSubtasksOnCard: true,
         assigneeId: true,
+        startDate: true,
+        dueDate: true,
         assignee: {
           select: {
             id: true,
@@ -586,6 +591,8 @@ export async function getSubtasks(
         showSubtasksOnCard: s.showSubtasksOnCard,
         assigneeId: s.assigneeId,
         assignee: s.assignee,
+        startDate: formatLocalDateToIso(s.startDate),
+        dueDate: formatLocalDateToIso(s.dueDate),
       })),
     };
   } catch {
@@ -599,6 +606,8 @@ export async function createSubtask(input: {
   title: string;
   assigneeId?: string | null;
   label?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
 }): Promise<TaskActionResult<SubtaskDTO>> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -616,9 +625,12 @@ export async function createSubtask(input: {
       select: { startDate: true, dueDate: true, label: true },
     });
 
-    const now = new Date();
-    const startDate = parent?.startDate ?? now;
-    const dueDate = parent?.dueDate ?? startDate;
+    const subtaskStartDate = input.startDate
+      ? parseDateStringToUtcDate(input.startDate)
+      : null;
+    const subtaskDueDate = input.dueDate
+      ? parseDateStringToUtcDate(input.dueDate)
+      : null;
     const subtaskLabel = input.label?.trim() || parent?.label || "MEDIUM";
 
     const subtask = await prisma.task.create({
@@ -629,8 +641,8 @@ export async function createSubtask(input: {
         title,
         bucket: "TODO",
         label: subtaskLabel,
-        startDate,
-        dueDate,
+        startDate: subtaskStartDate,
+        dueDate: subtaskDueDate,
         assigneeId: input.assigneeId || null,
       },
       select: {
@@ -640,6 +652,8 @@ export async function createSubtask(input: {
         label: true,
         showSubtasksOnCard: true,
         assigneeId: true,
+        startDate: true,
+        dueDate: true,
         assignee: {
           select: {
             id: true,
@@ -663,6 +677,8 @@ export async function createSubtask(input: {
         showSubtasksOnCard: subtask.showSubtasksOnCard,
         assigneeId: subtask.assigneeId,
         assignee: subtask.assignee,
+        startDate: formatLocalDateToIso(subtask.startDate),
+        dueDate: formatLocalDateToIso(subtask.dueDate),
       },
     };
   } catch {

@@ -379,6 +379,7 @@ export function TaskCard({
   };
 
   const formattedDueDate = (() => {
+    if (!task.dueDate) return null;
     try {
       const [year, month, day] = task.dueDate.split("-");
       if (!year || !month || !day) return task.dueDate;
@@ -663,7 +664,7 @@ export function TaskCard({
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50 text-[11px] text-text-muted">
           <div className="flex items-center gap-1 font-mono text-[10px] text-text-secondary">
             <IconClock className="size-3 shrink-0 text-text-muted" />
-            <span>{formattedDueDate}</span>
+            <span>{formattedDueDate ?? "Sin fecha"}</span>
           </div>
 
           <div className="flex items-center" onClick={(e) => e.stopPropagation()}>

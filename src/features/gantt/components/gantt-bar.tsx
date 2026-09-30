@@ -14,7 +14,7 @@ import {
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
 export interface GanttBarProps {
-  readonly task: TaskDTO;
+  readonly task: TaskDTO & { readonly startDate: string; readonly dueDate: string };
   readonly timelineStartIso: string;
   readonly columnWidthPx: number;
   readonly dragState: GanttDragState | null;

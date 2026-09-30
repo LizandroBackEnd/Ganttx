@@ -61,16 +61,22 @@ function formatLocalDateToIsoString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatShortDate(iso: string): string {
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
   const [year, month, day] = iso.split("-");
   return `${day}/${month}/${year?.slice(2)}`;
 }
 
+export type ScheduledTaskDTO = TaskDTO & {
+  readonly startDate: string;
+  readonly dueDate: string;
+};
+
 /** Sort tasks: epics in creation order, each immediately followed by their subtasks */
-function sortTasksHierarchically(tasks: readonly TaskDTO[]): TaskDTO[] {
+function sortTasksHierarchically<T extends TaskDTO>(tasks: readonly T[]): T[] {
   const epics = tasks.filter((t) => t.isEpic);
-  const subtasksByParent = new Map<string, TaskDTO[]>();
-  const standalones: TaskDTO[] = [];
+  const subtasksByParent = new Map<string, T[]>();
+  const standalones: T[] = [];
 
   for (const t of tasks) {
     if (t.isEpic) continue;
@@ -83,7 +89,7 @@ function sortTasksHierarchically(tasks: readonly TaskDTO[]): TaskDTO[] {
     }
   }
 
-  const sorted: TaskDTO[] = [];
+  const sorted: T[] = [];
   for (const epic of epics) {
     sorted.push(epic);
     const children = subtasksByParent.get(epic.id) ?? [];
@@ -175,15 +181,22 @@ export function GanttChart({
     onDatesUpdated: onTaskUpdated,
   });
 
-  // ── Task map for predecessor lookups ──────────────────────────────────
-  const taskMap = useMemo(() => {
-    const m = new Map<string, TaskDTO>();
-    for (const t of tasks) m.set(t.id, t);
-    return m;
+  // ── Scheduled tasks only for Gantt timeline ───────────────────────────
+  const scheduledTasks = useMemo(() => {
+    return tasks.filter(
+      (t): t is ScheduledTaskDTO => Boolean(t.startDate && t.dueDate)
+    );
   }, [tasks]);
 
+  // ── Task map for predecessor lookups ──────────────────────────────────
+  const taskMap = useMemo(() => {
+    const m = new Map<string, ScheduledTaskDTO>();
+    for (const t of scheduledTasks) m.set(t.id, t);
+    return m;
+  }, [scheduledTasks]);
+
   // ── Sorted rows (epics + subtasks grouped) ────────────────────────────
-  const sortedTasks = useMemo(() => sortTasksHierarchically(tasks), [tasks]);
+  const sortedTasks = useMemo(() => sortTasksHierarchically(scheduledTasks), [scheduledTasks]);
 
   // ── Visible rows after collapse ───────────────────────────────────────
   const visibleTasks = useMemo(() => {
@@ -207,11 +220,11 @@ export function GanttChart({
     let minDate = new Date();
     let maxDate = new Date();
 
-    if (tasks.length > 0) {
-      const startTimes = tasks.map((t) =>
+    if (scheduledTasks.length > 0) {
+      const startTimes = scheduledTasks.map((t) =>
         new Date(`${t.startDate}T00:00:00.000Z`).getTime()
       );
-      const dueTimes = tasks.map((t) =>
+      const dueTimes = scheduledTasks.map((t) =>
         new Date(`${t.dueDate}T00:00:00.000Z`).getTime()
       );
       minDate = new Date(Math.min(...startTimes));
@@ -251,7 +264,7 @@ export function GanttChart({
       columns: cols,
       timelineStartIso: cols[0]?.dateString ?? formatLocalDateToIsoString(new Date()),
     };
-  }, [tasks]);
+  }, [scheduledTasks]);
 
   const timelineWidthPx = columns.length * COLUMN_WIDTH_PX;
 

@@ -41,13 +41,6 @@ export interface TaskBucketColumnProps {
   readonly canDeleteBucket?: boolean;
 }
 
-function formatLocalDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export function TaskBucketColumn({
   bucket,
   tasks,
@@ -139,17 +132,13 @@ export function TaskBucketColumn({
     setIsSubmittingInline(true);
 
     try {
-      const today = new Date();
-      const nextWeek = new Date();
-      nextWeek.setDate(today.getDate() + 7);
-
       const res = await createTask({
         projectId,
         title: inlineTitle.trim(),
         bucket: bucket.id,
         label: "MEDIUM",
-        startDate: formatLocalDate(today),
-        dueDate: formatLocalDate(nextWeek),
+        startDate: null,
+        dueDate: null,
         isEpic: false,
       });
 

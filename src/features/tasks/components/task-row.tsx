@@ -148,7 +148,13 @@ export function TaskRow({
         <div className="flex flex-wrap items-center gap-3 shrink-0 text-xs text-text-muted">
           {/* Fechas */}
           <span className="font-mono text-[11px] text-text-secondary">
-            {task.startDate.slice(5)} → {task.dueDate.slice(5)}
+            {task.startDate && task.dueDate
+              ? `${task.startDate.slice(5)} → ${task.dueDate.slice(5)}`
+              : task.startDate
+              ? `Desde ${task.startDate.slice(5)}`
+              : task.dueDate
+              ? `Hasta ${task.dueDate.slice(5)}`
+              : "Sin fechas"}
           </span>
 
           {/* Predecesoras */}

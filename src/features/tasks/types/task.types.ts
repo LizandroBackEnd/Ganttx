@@ -24,8 +24,8 @@ export type CustomLabelOption = CustomPriorityOption;
 export interface TaskParentDTO {
   readonly id: string;
   readonly title: string;
-  readonly startDate?: string;
-  readonly dueDate?: string;
+  readonly startDate?: string | null;
+  readonly dueDate?: string | null;
 }
 
 export interface TaskPredecessorCandidateDTO {
@@ -34,8 +34,8 @@ export interface TaskPredecessorCandidateDTO {
   readonly bucket: string;
   readonly label: string;
   readonly isEpic: boolean;
-  readonly startDate: string;
-  readonly dueDate: string;
+  readonly startDate: string | null;
+  readonly dueDate: string | null;
   readonly parentId: string | null;
 }
 
@@ -45,8 +45,8 @@ export interface TaskDTO {
   readonly description: string | null;
   readonly label: string;
   readonly bucket: string;
-  readonly startDate: string;
-  readonly dueDate: string;
+  readonly startDate: string | null;
+  readonly dueDate: string | null;
   readonly predecessors: string | null;
   readonly isEpic: boolean;
   readonly parentId: string | null;
@@ -70,6 +70,8 @@ export interface SubtaskDTO {
   readonly showSubtasksOnCard?: boolean;
   readonly assigneeId: string | null;
   readonly assignee: TaskAssigneeDTO | null;
+  readonly startDate?: string | null;
+  readonly dueDate?: string | null;
 }
 
 export interface TaskCommentAuthorDTO {
@@ -104,6 +106,19 @@ export type TaskActionResult<T = void> = ActionSuccess<T> | ActionFailure;
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+export const optionalDateSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .refine((val) => val === null || val === "" || dateRegex.test(val), {
+    message: "Formato de fecha inválido (debe ser YYYY-MM-DD)",
+  })
+  .transform((val) => {
+    if (val === null || val === "") return null;
+    return val;
+  })
+  .optional();
+
 export const createTaskSchema = z
   .object({
     projectId: z.string().uuid("ID de proyecto inválido"),
@@ -111,18 +126,26 @@ export const createTaskSchema = z
     description: z.string().trim().max(2000).optional().nullable(),
     label: z.string().trim().max(50).default("MEDIUM"),
     bucket: z.string().trim().min(1, "El bucket es obligatorio").max(50),
-    startDate: z.string().regex(dateRegex, "Formato de fecha de inicio inválido"),
-    dueDate: z.string().regex(dateRegex, "Formato de fecha de fin inválido"),
+    startDate: optionalDateSchema,
+    dueDate: optionalDateSchema,
     predecessors: z.string().trim().max(500).optional().nullable(),
     isEpic: z.boolean().default(false),
     showSubtasksOnCard: z.boolean().default(false),
     parentId: z.string().uuid("ID de tarea padre inválido").optional().nullable(),
     assigneeId: z.string().uuid("ID de asignado inválido").optional().nullable(),
   })
-  .refine((data) => data.dueDate >= data.startDate, {
-    message: "La fecha de fin no puede ser anterior a la fecha de inicio",
-    path: ["dueDate"],
-  })
+  .refine(
+    (data) => {
+      if (data.startDate && data.dueDate) {
+        return data.dueDate >= data.startDate;
+      }
+      return true;
+    },
+    {
+      message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      path: ["dueDate"],
+    }
+  )
   .refine((data) => !(Boolean(data.parentId) && data.isEpic), {
     message: "Una subtarea no puede ser marcada como EPIC",
     path: ["isEpic"],
@@ -137,14 +160,26 @@ export const updateTaskSchema = z
     description: z.string().trim().max(2000).optional().nullable(),
     label: z.string().trim().max(50).optional(),
     bucket: z.string().trim().max(50).optional(),
-    startDate: z.string().regex(dateRegex).optional(),
-    dueDate: z.string().regex(dateRegex).optional(),
+    startDate: optionalDateSchema,
+    dueDate: optionalDateSchema,
     predecessors: z.string().trim().max(500).optional().nullable(),
     isEpic: z.boolean().optional(),
     showSubtasksOnCard: z.boolean().optional(),
     parentId: z.string().uuid().optional().nullable(),
     assigneeId: z.string().uuid().optional().nullable(),
   })
+  .refine(
+    (data) => {
+      if (data.startDate && data.dueDate) {
+        return data.dueDate >= data.startDate;
+      }
+      return true;
+    },
+    {
+      message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      path: ["dueDate"],
+    }
+  )
   .refine((data) => !(Boolean(data.parentId) && data.isEpic), {
     message: "Una subtarea no puede ser marcada como EPIC",
     path: ["isEpic"],
@@ -155,13 +190,21 @@ export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export const updateTaskDatesSchema = z
   .object({
     taskId: z.string().uuid("ID de tarea inválido"),
-    startDate: z.string().regex(dateRegex, "Fecha de inicio inválida"),
-    dueDate: z.string().regex(dateRegex, "Fecha de fin inválida"),
+    startDate: optionalDateSchema,
+    dueDate: optionalDateSchema,
   })
-  .refine((data) => data.dueDate >= data.startDate, {
-    message: "La fecha de fin no puede ser anterior a la fecha de inicio",
-    path: ["dueDate"],
-  });
+  .refine(
+    (data) => {
+      if (data.startDate && data.dueDate) {
+        return data.dueDate >= data.startDate;
+      }
+      return true;
+    },
+    {
+      message: "La fecha de fin no puede ser anterior a la fecha de inicio",
+      path: ["dueDate"],
+    }
+  );
 
 export type UpdateTaskDatesInput = z.infer<typeof updateTaskDatesSchema>;
 

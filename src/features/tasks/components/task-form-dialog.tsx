@@ -85,27 +85,11 @@ export interface TaskFormDialogProps {
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
-  readonly parentStartDate?: string;
-  readonly parentDueDate?: string;
+  readonly parentStartDate?: string | null;
+  readonly parentDueDate?: string | null;
   readonly availableTasks?: readonly TaskDTO[];
 }
 
-function formatLocalDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getTodayString(): string {
-  return formatLocalDate(new Date());
-}
-
-function getOneWeekLaterString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  return formatLocalDate(d);
-}
 
 const fallbackStatuses: CustomStatusOption[] = [
   { id: "TODO", label: "Por Hacer" },
@@ -135,8 +119,8 @@ interface TaskFormContentProps {
   readonly onTaskCreatedOrUpdated?: (task: TaskDTO) => void;
   readonly isSubtask?: boolean;
   readonly parentTitle?: string;
-  readonly parentStartDate?: string;
-  readonly parentDueDate?: string;
+  readonly parentStartDate?: string | null;
+  readonly parentDueDate?: string | null;
   readonly availableTasks?: readonly TaskDTO[];
 }
 
@@ -172,8 +156,8 @@ function TaskFormContent({
   // Form State initialized directly from initialTask
   const [title, setTitle] = useState<string>(initialTask?.title ?? "");
   const [assigneeId, setAssigneeId] = useState<string>(initialTask?.assigneeId ?? "");
-  const [startDate, setStartDate] = useState<string>(initialTask?.startDate ?? getTodayString());
-  const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? getOneWeekLaterString());
+  const [startDate, setStartDate] = useState<string>(initialTask?.startDate ?? "");
+  const [dueDate, setDueDate] = useState<string>(initialTask?.dueDate ?? "");
   const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
   const [isEpic, setIsEpic] = useState<boolean>(isSubtask ? false : (initialTask?.isEpic ?? false));
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
@@ -517,8 +501,8 @@ function TaskFormContent({
             title: candidateTitle,
             bucket: (updates.bucket ?? bucket) || defaultStatus || "TODO",
             label: (updates.label ?? label) || "MEDIUM",
-            startDate: updates.startDate ?? startDate,
-            dueDate: updates.dueDate ?? dueDate,
+            startDate: updates.startDate !== undefined ? (updates.startDate || null) : (startDate || null),
+            dueDate: updates.dueDate !== undefined ? (updates.dueDate || null) : (dueDate || null),
             isEpic: updates.isEpic ?? isEpic,
             showSubtasksOnCard: updates.showSubtasksOnCard ?? showSubtasksOnCard,
             parentId: updates.parentId !== undefined ? updates.parentId : parentId || undefined,
@@ -554,6 +538,14 @@ function TaskFormContent({
           const updatedDto = {
             ...(currentTask ?? initialTask),
             ...updates,
+            startDate:
+              updates.startDate !== undefined
+                ? (updates.startDate || null)
+                : ((currentTask ?? initialTask)?.startDate ?? null),
+            dueDate:
+              updates.dueDate !== undefined
+                ? (updates.dueDate || null)
+                : ((currentTask ?? initialTask)?.dueDate ?? null),
           } as TaskDTO;
           setCurrentTask(updatedDto);
           onTaskCreatedOrUpdated?.(updatedDto);
@@ -806,14 +798,20 @@ function TaskFormContent({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="task-start" className="text-xs font-semibold text-text-primary">
-              Fecha de inicio *
+              Fecha de inicio
             </label>
             <DatePicker
               id="task-start"
               value={startDate}
-              minDate={isSubtask ? effectiveParentStartDate : undefined}
-              maxDate={isSubtask ? (effectiveParentDueDate || dueDate) : undefined}
+              placeholder=""
+              minDate={isSubtask ? effectiveParentStartDate || undefined : undefined}
+              maxDate={isSubtask ? (effectiveParentDueDate || dueDate || undefined) : (dueDate || undefined)}
               onChange={(newStart) => {
+                if (!newStart) {
+                  setStartDate("");
+                  triggerImmediateSave({ startDate: null });
+                  return;
+                }
                 if (isSubtask && effectiveParentStartDate && newStart < effectiveParentStartDate) {
                   sileo.error({
                     title: "Fecha de inicio no permitida",
@@ -828,7 +826,7 @@ function TaskFormContent({
                   });
                   return;
                 }
-                if (newStart > dueDate) {
+                if (dueDate && newStart > dueDate) {
                   setDueDate(newStart);
                   triggerImmediateSave({ startDate: newStart, dueDate: newStart });
                 } else {
@@ -836,20 +834,25 @@ function TaskFormContent({
                 }
                 setStartDate(newStart);
               }}
-              required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="task-due" className="text-xs font-semibold text-text-primary">
-              Fecha de fin *
+              Fecha de fin
             </label>
             <DatePicker
               id="task-due"
               value={dueDate}
-              minDate={startDate}
-              maxDate={isSubtask ? effectiveParentDueDate : undefined}
+              placeholder=""
+              minDate={startDate || (isSubtask ? effectiveParentStartDate || undefined : undefined)}
+              maxDate={isSubtask ? effectiveParentDueDate || undefined : undefined}
               onChange={(newDue) => {
+                if (!newDue) {
+                  setDueDate("");
+                  triggerImmediateSave({ dueDate: null });
+                  return;
+                }
                 if (isSubtask && effectiveParentDueDate && newDue > effectiveParentDueDate) {
                   sileo.error({
                     title: "Fecha de fin no permitida",
@@ -857,7 +860,7 @@ function TaskFormContent({
                   });
                   return;
                 }
-                if (newDue < startDate) {
+                if (startDate && newDue < startDate) {
                   sileo.error({
                     title: "Fecha de fin no permitida",
                     description: "La fecha de fin no puede ser anterior a la fecha de inicio.",
@@ -867,7 +870,6 @@ function TaskFormContent({
                 setDueDate(newDue);
                 triggerImmediateSave({ dueDate: newDue });
               }}
-              required
             />
           </div>
         </div>
