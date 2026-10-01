@@ -8,9 +8,12 @@ import {
   getBucketColor,
   getProjectBuckets,
   isTaskDone,
+  parseTaskLabels,
   type TaskDTO,
   type CustomStatusOption,
+  type CustomPriorityOption,
 } from "@/features/tasks";
+import { TASK_PRIORITY_LABELS, type TaskPriority } from "@/lib/constants";
 import type { GanttDragMode, GanttDragState } from "../types/gantt.types";
 
 export interface GanttBarProps {
@@ -27,6 +30,7 @@ export interface GanttBarProps {
   ) => void;
   readonly onClick?: () => void;
   readonly customStatuses?: readonly CustomStatusOption[] | null;
+  readonly customPriorities?: readonly CustomPriorityOption[] | null;
 }
 
 function getDayDiff(startDateIso: string, targetDateIso: string): number {
@@ -126,6 +130,7 @@ export function GanttBar({
   onStartDrag,
   onClick,
   customStatuses,
+  customPriorities,
 }: GanttBarProps): React.JSX.Element {
   const isCurrentlyDragging = dragState?.taskId === task.id;
 
@@ -234,12 +239,38 @@ export function GanttBar({
             {task.title}
           </span>
         </div>
-        {/* Label (priority) badge + bucket (status) badge */}
+        {/* Label (priority/custom labels) badge(s) + bucket (status) badge */}
         <div className="flex items-center gap-1 ml-1.5 shrink-0">
-          {/* Priority label */}
-          <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-semibold bg-white/10 text-text-primary/80 leading-4">
-            {task.label.split(",")[0]?.trim()}
-          </span>
+          {/* Priority / Custom labels */}
+          {parseTaskLabels(task.label).map((lblId) => {
+            const custom = customPriorities?.find(
+              (p) => p.id === lblId || p.label.toUpperCase() === lblId.toUpperCase()
+            );
+            const displayLabel =
+              custom?.label ?? TASK_PRIORITY_LABELS[lblId as TaskPriority] ?? lblId;
+            const color = custom?.color;
+
+            return (
+              <span
+                key={lblId}
+                style={
+                  color
+                    ? {
+                        backgroundColor: `${color}25`,
+                        borderColor: `${color}50`,
+                        color: color,
+                      }
+                    : undefined
+                }
+                className={cn(
+                  "inline-flex items-center rounded border px-1 py-0 text-[9px] font-semibold leading-4 shrink-0 font-mono uppercase tracking-wider",
+                  !color && "bg-white/10 border-white/20 text-text-primary/90"
+                )}
+              >
+                {displayLabel}
+              </span>
+            );
+          })}
           {/* Bucket / status */}
           <span className="inline-flex items-center gap-1 rounded px-1.5 py-0 text-[9px] font-semibold bg-black/30 text-text-primary/90 leading-4">
             <span

@@ -6,6 +6,7 @@ import { GanttBar } from "./gantt-bar";
 import { useGanttDrag } from "../hooks/use-gantt-drag";
 import {
   TaskFormDialog,
+  TaskPriorityBadge,
   type ProjectMemberOption,
   type TaskDTO,
   type TaskParentDTO,
@@ -675,12 +676,17 @@ export function GanttChart({
                     {/* Activity name */}
                     <button
                       type="button"
-                      className="flex-1 min-w-0 text-left"
+                      className="flex-1 min-w-0 text-left flex items-center gap-1.5 overflow-hidden pr-1"
                       onClick={() => setSelectedTask(task)}
                     >
-                      <span className="truncate text-[11px] font-medium text-text-primary block">
+                      <span className="truncate text-[11px] font-medium text-text-primary">
                         {task.title}
                       </span>
+                      <TaskPriorityBadge
+                        label={task.label}
+                        customPriorities={customPriorities}
+                        className="shrink-0 text-[8px] h-3.5 px-1 py-0 leading-none"
+                      />
                     </button>
 
                     {/* Start date */}
@@ -730,6 +736,7 @@ export function GanttChart({
                       onStartDrag={startDrag}
                       onClick={() => setSelectedTask(task)}
                       customStatuses={customStatuses}
+                      customPriorities={customPriorities}
                     />
                   </div>
                 </div>
