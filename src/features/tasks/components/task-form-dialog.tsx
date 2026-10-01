@@ -91,13 +91,6 @@ export interface TaskFormDialogProps {
 }
 
 
-const fallbackStatuses: CustomStatusOption[] = [
-  { id: "TODO", label: "Por Hacer" },
-  { id: "IN_PROGRESS", label: "En Progreso" },
-  { id: "IN_REVIEW", label: "En Revisión" },
-  { id: "DONE", label: "Completada" },
-  { id: "CANCELLED", label: "Cancelada" },
-];
 
 const fallbackPriorities: CustomPriorityOption[] = [
   { id: "LOW", label: "Baja", color: "#0284c7" },
@@ -161,7 +154,8 @@ function TaskFormContent({
   const [predecessors, setPredecessors] = useState<string>(initialTask?.predecessors ?? "");
   const [isEpic, setIsEpic] = useState<boolean>(isSubtask ? false : (initialTask?.isEpic ?? false));
   const [parentId, setParentId] = useState<string>(initialTask?.parentId ?? "");
-  const bucket = initialTask?.bucket ?? defaultStatus ?? "TODO";
+  const defaultFallbackBucket = customStatuses && customStatuses.length > 0 ? customStatuses[0].id : "";
+  const bucket = initialTask?.bucket ?? defaultStatus ?? defaultFallbackBucket;
   const [label, setLabel] = useState<string>(initialTask?.label ?? "MEDIUM");
   const currentLabels = useMemo(() => parseTaskLabels(label), [label]);
 
@@ -499,7 +493,7 @@ function TaskFormContent({
           const res = await createTask({
             projectId,
             title: candidateTitle,
-            bucket: (updates.bucket ?? bucket) || defaultStatus || "TODO",
+            bucket: (updates.bucket ?? bucket) || defaultStatus || defaultFallbackBucket,
             label: (updates.label ?? label) || "MEDIUM",
             startDate: updates.startDate !== undefined ? (updates.startDate || null) : (startDate || null),
             dueDate: updates.dueDate !== undefined ? (updates.dueDate || null) : (dueDate || null),
@@ -570,6 +564,7 @@ function TaskFormContent({
       projectId,
       bucket,
       defaultStatus,
+      defaultFallbackBucket,
       label,
       startDate,
       dueDate,
@@ -1225,7 +1220,7 @@ export function TaskFormDialog({
   projectId,
   members = [],
   availableEpics = [],
-  customStatuses = fallbackStatuses,
+  customStatuses = [],
   customPriorities = fallbackPriorities,
   taskToEdit,
   task: taskAlias,
@@ -1257,7 +1252,7 @@ export function TaskFormDialog({
     : setInternalOpen;
 
   const [statuses, setStatuses] = useState<CustomStatusOption[]>(
-    customStatuses && customStatuses.length > 0 ? [...customStatuses] : fallbackStatuses
+    customStatuses && customStatuses.length > 0 ? [...customStatuses] : []
   );
   const [priorities, setPriorities] = useState<CustomPriorityOption[]>(
     customPriorities && customPriorities.length > 0 ? [...customPriorities] : fallbackPriorities

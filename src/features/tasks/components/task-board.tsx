@@ -35,10 +35,12 @@ import {
   IconTable,
   IconAdjustmentsHorizontal,
   IconX,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { sileo } from "sileo";
 import { updateTaskStatus, updateProjectCustomOptions } from "../api/task-mutations";
 import {
+  DEFAULT_BUCKETS,
   getProjectBuckets,
   getTaskBucketId,
   isTaskDone,
@@ -257,6 +259,7 @@ export function TaskBoard({
           description: `El bucket "${newBucket.label}" fue agregado con éxito.`,
         });
         startTransition(() => {
+          setOptimisticBuckets(updatedBuckets);
           router.refresh();
         });
       }
@@ -270,6 +273,35 @@ export function TaskBoard({
     } finally {
       setIsSavingBucket(false);
     }
+  };
+
+  // Quick action: Load default standard buckets on demand
+  const handleLoadDefaultBuckets = async (): Promise<void> => {
+    startTransition(async () => {
+      setOptimisticBuckets([...DEFAULT_BUCKETS]);
+      try {
+        const result = await updateProjectCustomOptions(projectId, {
+          customStatuses: DEFAULT_BUCKETS,
+        });
+        if (result.success) {
+          sileo.success({
+            title: "Columnas cargadas",
+            description: "Se configuró el flujo estándar en tu tablero.",
+          });
+          router.refresh();
+        } else {
+          sileo.error({
+            title: "Error al cargar columnas",
+            description: result.error,
+          });
+        }
+      } catch {
+        sileo.error({
+          title: "Error al cargar columnas",
+          description: "Ocurrió un error al guardar las columnas por defecto.",
+        });
+      }
+    });
   };
 
   // Internal executor for bucket deletion
@@ -286,6 +318,7 @@ export function TaskBoard({
           description: `El bucket "${bucketLabel}" fue eliminado.`,
         });
         startTransition(() => {
+          setOptimisticBuckets(updatedBuckets);
           router.refresh();
         });
       } else {
@@ -304,13 +337,7 @@ export function TaskBoard({
 
   // Handle Delete Bucket with confirmation toast and "No volver a preguntar" option
   const handleDeleteBucket = async (bucketId: string): Promise<void> => {
-    if (buckets.length <= 1) {
-      sileo.warning({
-        title: "Acción no permitida",
-        description: "Debes conservar al menos un bucket en el proyecto.",
-      });
-      return;
-    }
+    if (buckets.length === 0) return;
 
     const tasksInBucket = optimisticTasks.filter(
       (t) => getTaskBucketId(t.bucket) === bucketId
@@ -545,7 +572,16 @@ export function TaskBoard({
                 size="sm"
                 variant="default"
                 onClick={() => setIsNewTaskOpen(true)}
-                className="h-8.5 bg-primary text-primary-foreground hover:bg-primary-hover font-semibold text-xs gap-1.5 rounded-xl shadow-xs"
+                disabled={buckets.length === 0}
+                title={
+                  buckets.length === 0
+                    ? "Primero debés crear un bucket para poder agregar tareas"
+                    : "Nueva Tarea"
+                }
+                className={cn(
+                  "h-8.5 bg-primary text-primary-foreground hover:bg-primary-hover font-semibold text-xs gap-1.5 rounded-xl shadow-xs",
+                  buckets.length === 0 && "opacity-50 cursor-not-allowed"
+                )}
               >
                 <IconPlus className="size-3.5" />
                 <span>Nueva Tarea</span>
@@ -570,45 +606,87 @@ export function TaskBoard({
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex items-stretch gap-4 overflow-x-auto pb-3 pt-1 select-none">
-          {buckets.map((bucket) => {
-            const bucketTasks = filteredTasks.filter(
-              (task) => getTaskBucketId(task.bucket) === bucket.id
-            );
-            return (
-              <TaskBucketColumn
-                key={bucket.id}
-                bucket={bucket}
-                tasks={bucketTasks}
-                projectId={projectId}
-                members={members}
-                availableEpics={availableEpics}
-                customStatuses={customStatuses}
-                customPriorities={customPriorities}
-                canEdit={canEdit}
-                allTasks={tasks}
-                onTaskDrop={handleTaskDrop}
-                onBucketReorder={handleBucketReorder}
-                onUpdateBucket={handleUpdateBucket}
-                onDeleteBucket={handleDeleteBucket}
-                canDeleteBucket={canEdit && buckets.length > 1}
-              />
-            );
-          })}
-
-          {/* Add Bucket Quick Card at end of columns */}
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setIsNewBucketOpen(true)}
-              className="flex flex-col items-center justify-center gap-2.5 w-72 md:w-80 shrink-0 h-36 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-surface/30 hover:bg-surface/60 text-text-muted hover:text-primary transition-all group self-start"
-            >
-              <div className="flex size-9 items-center justify-center rounded-xl bg-surface-elevated border border-border group-hover:border-primary/40 group-hover:scale-105 transition-all text-text-secondary group-hover:text-primary shadow-2xs">
-                <IconPlus className="size-5" />
+          {buckets.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-95">
+              <div className="relative mb-4 flex size-16 items-center justify-center rounded-2xl bg-surface-elevated border border-border shadow-xs text-primary">
+                <IconLayoutKanban className="size-8" />
+                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary">
+                  <span className="size-2 rounded-full bg-primary animate-pulse" />
+                </span>
               </div>
-              <span className="text-xs font-semibold tracking-tight">
-                Crear nuevo bucket
-              </span>
-            </button>
+              <h3 className="text-base font-bold text-text-primary tracking-tight">
+                Tu tablero no tiene buckets
+              </h3>
+              <p className="mt-1.5 text-xs text-text-muted max-w-md leading-relaxed">
+                Para comenzar a organizar el flujo de trabajo y crear tareas, necesitás definir tu primera columna (ej. <em>Por Hacer</em>, <em>En Progreso</em> o <em>Completadas</em>).
+              </p>
+
+              {canEdit && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => setIsNewBucketOpen(true)}
+                    className="h-9 px-4 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover rounded-xl shadow-xs gap-1.5"
+                  >
+                    <IconPlus className="size-4" />
+                    <span>Crear primer bucket</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleLoadDefaultBuckets}
+                    className="h-9 px-4 text-xs font-medium border-border hover:bg-surface-elevated text-text-secondary hover:text-text-primary rounded-xl gap-1.5"
+                  >
+                    <IconSparkles className="size-3.5 text-amber-500" />
+                    <span>Cargar flujo estándar</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {buckets.map((bucket) => {
+                const bucketTasks = filteredTasks.filter(
+                  (task) => getTaskBucketId(task.bucket) === bucket.id
+                );
+                return (
+                  <TaskBucketColumn
+                    key={bucket.id}
+                    bucket={bucket}
+                    tasks={bucketTasks}
+                    projectId={projectId}
+                    members={members}
+                    availableEpics={availableEpics}
+                    customStatuses={customStatuses}
+                    customPriorities={customPriorities}
+                    canEdit={canEdit}
+                    allTasks={tasks}
+                    onTaskDrop={handleTaskDrop}
+                    onBucketReorder={handleBucketReorder}
+                    onUpdateBucket={handleUpdateBucket}
+                    onDeleteBucket={handleDeleteBucket}
+                    canDeleteBucket={canEdit}
+                  />
+                );
+              })}
+
+              {/* Add Bucket Quick Card at end of columns */}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setIsNewBucketOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2.5 w-72 md:w-80 shrink-0 h-36 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-surface/30 hover:bg-surface/60 text-text-muted hover:text-primary transition-all group self-start"
+                >
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-surface-elevated border border-border group-hover:border-primary/40 group-hover:scale-105 transition-all text-text-secondary group-hover:text-primary shadow-2xs">
+                    <IconPlus className="size-5" />
+                  </div>
+                  <span className="text-xs font-semibold tracking-tight">
+                    Crear nuevo bucket
+                  </span>
+                </button>
+              )}
+            </>
           )}
         </div>
       )}

@@ -51,13 +51,7 @@ export function TaskTable({
         ...customStatuses.map((s) => ({ id: s.id, label: s.label })),
       ];
     }
-    return [
-      { id: "ALL", label: "Todas" },
-      { id: "TODO", label: "Por Hacer" },
-      { id: "IN_PROGRESS", label: "En Progreso" },
-      { id: "IN_REVIEW", label: "En Revisión" },
-      { id: "DONE", label: "Completadas" },
-    ];
+    return [{ id: "ALL", label: "Todas" }];
   }, [customStatuses]);
 
   const cardTasks = useMemo(() => {
@@ -175,9 +169,11 @@ export function TaskTable({
             <p className="mt-1 text-xs text-text-secondary max-w-xs">
               {searchQuery
                 ? "No hay tareas que coincidan con la búsqueda."
-                : "Aún no hay tareas en este estado."}
+                : customStatuses && customStatuses.length > 0
+                ? "Aún no hay tareas en este estado."
+                : "Este proyecto aún no tiene buckets configurados. Definí un bucket en el tablero para comenzar."}
             </p>
-            {canEdit && !searchQuery && (
+            {canEdit && !searchQuery && customStatuses && customStatuses.length > 0 && (
               <div className="mt-4">
                 <TaskFormDialog
                   projectId={projectId}

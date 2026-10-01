@@ -44,6 +44,7 @@ export async function createProject(
         data: {
           name: parsed.data.name,
           description: parsed.data.description ?? null,
+          customStatuses: [],
         },
         select: { id: true },
       });

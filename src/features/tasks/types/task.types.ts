@@ -265,7 +265,7 @@ export function getProjectBuckets(
       color: s.color ?? getBucketColor(s.id),
     }));
   }
-  return [...DEFAULT_BUCKETS];
+  return [];
 }
 
 export function isTaskDone(bucket: string): boolean {
